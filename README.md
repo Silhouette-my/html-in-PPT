@@ -1,49 +1,133 @@
 # HTML Deck
 
-生成大学课堂 pre、课程报告和答辩用的离线 HTML 幻灯片。
+为大学课堂 pre、课程报告和答辩生成离线 HTML 幻灯片。双击 `assets/deck-template.html` 即可打开 10 页可运行示例，无需安装依赖或启动服务。除熟悉的放映操作，还支持逐步讲解、实时数学图表、物理模拟和可旋转三维模型。
 
-## 安装 skill
+工作区按用户提供的六张 PowerPoint 网页版截图重建：完整标签顺序、居中搜索、右侧操作区、单行功能区、文件浮层菜单、可折叠缩略图栏、紧凑备注条与缩放状态栏。按用户要求使用 PowerPoint 名称与官方图标，图标已内嵌，离线可显示。云端协作和未实现的内容编辑控件禁用，并通过提示说明原因。
 
-把整个 `html-deck` 文件夹复制到支持文件夹式 skills 的工具的技能目录，保留 `SKILL.md`、`assets`、`references`、`scripts`。具体目录取决于所用工具，例如某些 Codex 环境使用 `~/.agents/skills/`，某些 Claude Code 环境使用 `~/.claude/skills/`。此压缩包并不代表已自动安装到当前聊天；目标工具必须支持读取这些本地资源。
+## 开始一次 pre
 
-## 使用示例
+1. 在“幻灯片放映”中选择“从头开始”或“从当前幻灯片开始”；右上角“演示”也可启动放映。全屏未获浏览器允许时仍可窗口内放映。
+2. 需要看讲稿时，先点击“演示者视图”。它会打开独立窗口，显示当前页、下一页、备注和计时。将窗口拖到自己的显示器，只向听众共享另一个放映窗口。浏览器拦截弹窗时，允许本页弹窗再重试。
+3. 点击幻灯片背景，或按方向键 / Space 执行下一步：先显示本页下一组内容，再翻页。上一页按钮 / ← 先撤回一步，再回到上一页的完整状态。数字 + Enter 直接跳页，G 打开所有幻灯片，Esc 结束放映。
+4. 放映中按 B / W 切换黑屏 / 白屏；L 开关激光笔，P 开关画笔，E 清除本页墨迹。墨迹按页保留到关闭页面，不写入文件或 PDF。
+5. 点击“文件”打开浮层菜单。“打印”可通过浏览器另存 PDF；“创建副本 · HTML”或“导出 · HTML”下载完整程序和内嵌资源，不包含临时墨迹、步骤、计时、交互参数或模拟状态。“重命名”修改显示名称和下载副本名称，不更改磁盘上的原文件。
 
-> 使用 html-deck skill，为我的“生成式 AI 对大学学习的影响”做一个 8 分钟中文 pre。受众是同班同学，需要问题、论证、案例、局限和参考文献。输出一个离线 HTML，打开像 PowerPoint 的浏览工作区，点击后能全屏放映。以下是我的材料：……
+工作区始终显示完整内容。每次从工作区开始放映，从当前页第 0 步开始；缩略图、概览、页码和 URL 跳转同样重置目标页步骤。“动画”中的“逐步显示”可开关此行为，“重置当前页步骤”可重讲；“切换”中的“淡入切换”提供真实淡入，系统减少动态效果设置优先。点击链接、表单、视频或交互模型不会推进步骤；画笔、激光笔、拖动、选中文字时也不会误翻页。
 
-将主题和材料替换成你的作业内容。没有真实资料时，skill 应标注缺失信息，而不是编造文献和数据。
+## 试用 HTML 独有的演示
 
-## 先看效果
+- **第 2、3 页：逐步讲解。** 第 2 页有 3 组要点，第 3 页有 4 个流程步骤；放映控制条及演示者窗口显示当前步骤。
+- **第 6 页：实时数学图表。** 调节逻辑函数的陡峭程度与中心，SVG 曲线及 `y(1)` 立即重算。初始值为 `0.7311`；这是数学模型，不是实验数据。
+- **第 7 页：阻尼弹簧。** 运行 / 暂停 / 重置，调整阻尼和劲度，查看以米、秒、米每秒表示的真实数值积分结果。离开页面、隐藏浏览器页面、黑屏或打印会暂停；返回后手动继续，不会在后台持续计算。
+- **第 8 页：三维结构。** 直接拖动 CSS 3D 立方体，也可用角度滑块；模型获得焦点后，方向键旋转，重置恢复默认视角。不会自动旋转。
 
-双击 `assets/deck-template.html`：左边为真实缩略图，中间为 16:9 画布，下方为讲稿。点击“开始放映”进入演示。方向键 / Space 翻页，Home / End 到首尾，Esc 返回；“概览”可快速跳页。点击“打印 / PDF”，在浏览器打印窗口选择“另存为 PDF”。
+打印显示全部步骤；实时图表保留当前曲线，物理与三维模型使用清楚标明的静态结构图。缩略图、概览与演示者下一页预览同样保持内容完整；演示者当前页与听众的揭示步骤同步。
 
-模板是可运行的 7 页演示，不是空白壳。它也不是完整 PPT 编辑器：没有拖拽编辑、保存编辑、PPTX 导出或双屏演讲者窗口。修改内容由 AI 改写 HTML 完成。讲稿会显示在工作区，屏幕共享时请先进入放映。
+顶部搜索可查找并执行演示命令，也可按标题或页码定位幻灯片。“视图”提供备注、标尺、幻灯片浏览、常规、缩放与适应窗口；底部备注条点击展开，再点收起。缩略图栏边缘按钮可折叠侧栏，功能区右端箭头可折叠功能区。
 
-创建副本：
+放映底部左侧保留紧凑控制条；画笔和更多菜单提供激光笔、清除墨迹、黑屏、计时、快捷键与结束放映。计时也可通过“开始”功能区末尾更多菜单或顶部搜索操作，支持开始、暂停、继续和重置；结束放映自动暂停，再次开始继续累计。首次开始新的排练前可重置。F1 可查快捷键；F5 从头放映，Shift+F5 从当前页放映。
+
+## 用自己的材料生成
 
 ```bash
 python3 scripts/new_deck.py presentation.html
 ```
 
-然后由 AI 根据 `SKILL.md` 替换示例内容、讲稿、标题和视觉设计。
+脚本复制完整模板，不覆盖已有文件。随后由 AI 按 `SKILL.md` 替换示例内容、标题、讲稿、来源和视觉设计。默认生成 `.html`；配套 PPTX 导出见下节。
 
-## 本地继续开发
+示例请求：
+
+> 使用 html-deck skill，为我的“生成式 AI 对大学学习的影响”做一个 8 分钟中文 pre。受众是同班同学，需要问题、论证、案例、局限和参考文献。输出一个可离线打开、带备注和演讲者视图的 HTML。以下是我的材料：……
+
+没有真实材料时应标明信息缺口，不能编造文献或数据。编辑内容由 AI 改写 HTML 完成；模板没有拖拽编辑、云保存或协作；配套脚本能生成真实的截图式 PPTX。
+
+## 生成配套 PowerPoint
+
+按 [PPTX 导出流程](references/pptx-export.md) 捕获每页完整画面，然后运行 `scripts/export_pptx.mjs`。PPTX 每页为对应 HTML 页的截图，第一页整页可点击打开同目录 HTML；搬到别的电脑时两个文件必须一起搬。交互、动画和模拟在 HTML 中运行。PowerPoint 若显示打开外部文件的安全提示，由用户确认。
+
+顶部显示 `.pptx` 文稿名，浏览器标签使用内嵌 PowerPoint 图标；HTML 下载仍保留正确的 `.html` 扩展名。
+
+## Windows / macOS
+
+HTML 成品双击即可打开，不需要 Python、Node.js 或服务器。Windows 推荐 Edge / Chrome，macOS 推荐 Chrome / Safari。系统字体按平台自动回退，画布保持 16:9。
+
+| 操作 | Windows | macOS |
+| --- | --- | --- |
+| 从头放映 | F5 | ⌘⇧Return（也可 Fn+F5） |
+| 从当前页放映 | Shift+F5 | ⌘Return |
+| 下一步 / 上一步 | → / ←、Space / PageUp | → / ←、Space / Fn+↑ |
+| 首页 / 末页 | Home / End | Fn+← / Fn+→ |
+| 退出放映 | Esc | Esc |
+| 打印 | Ctrl+P | ⌘P |
+
+功能键被系统或浏览器占用时，用界面上的放映按钮。全屏被拒绝时仍在窗口内放映，演示者视图需要允许弹窗。
+
+PPTX 和 HTML 要一起解压到同一目录，再用桌面 PowerPoint 打开放映。macOS 首次跳转可能要求授予 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标是自己的 HTML 后再打开，不需要关闭受保护视图或全局安全设置。PPTX 图片是静态内容，交互在浏览器中运行。
+
+## 安装和调用 skill
+
+本仓库本身就是一个文件夹式 skill，名称为 `html-deck`。**下载源码或 ZIP 不等于已经安装。**
+
+Codex 用户可将仓库克隆到用户技能目录，目标目录已存在时先检查，不覆盖：
+
+macOS（终端）：
+
+```bash
+git clone https://github.com/Silhouette-my/html-in-PPT.git "$HOME/.codex/skills/html-deck"
+```
+
+Windows（PowerShell）：
+
+```powershell
+git clone https://github.com/Silhouette-my/html-in-PPT.git "$env:USERPROFILE/.codex/skills/html-deck"
+```
+
+如果设置了 `CODEX_HOME`，改用其 `skills/html-deck` 子目录。也可以把 skill ZIP 中的 `html-deck` 文件夹解压到这个位置。重新打开会话，让工具发现 skill；其他 AI 工具使用其自己的 skills 目录。
+
+随后发送：
+
+> 使用 $html-deck，按下面的资料制作一个 8 分钟中文 pre，输出配套 HTML 和 PPTX。资料：……
+
+### skill 是怎样生效的
+
+1. 工具扫描 `SKILL.md` 的名称和 description。显式写 `$html-deck` 可指定它，也可由工具按任务描述匹配。
+2. 模型读取 skill 正文，按需读取设计、交互和 PPTX 导出参考。它们是生成工作的说明，不是后台常驻程序。
+3. 模型复制 HTML 模板，改写主题内容、视觉和讲稿。模板内的 JavaScript 负责点击推进、缩放、画笔、计时和交互模型；成品运行时不需要 AI。
+4. 请求 PPTX 时，模型通过浏览器逐页截图，再运行导出器。导出器生成真实 OOXML，并把第一页链接指向 HTML，最后验证和交付两份文件。
+
+`new_deck.py` 只复制模板，不会自行写作或自动截图。HTML 制作不依赖 PPTX 工具链；PPTX 导出需要 [导出文档](references/pptx-export.md) 中的 Artifact Tool 运行环境。
+
+## 开发文件
+
+获取项目：
 
 ```bash
 git clone https://github.com/Silhouette-my/html-in-PPT.git
 cd html-in-PPT
 ```
 
-直接用浏览器打开 `assets/deck-template.html` 查看样例，无需安装 Node.js 或启动服务。创建副本的脚本需要 Python 3。
-
 | 文件 | 用途 |
 | --- | --- |
-| `SKILL.md` | AI 的生成流程、内容约束与验收要求 |
-| `assets/deck-template.html` | 单文件演示引擎、样式与 7 页中文样例 |
+| `SKILL.md` | AI 生成流程、内容约束与验收要求 |
+| `assets/deck-template.html` | 自包含样式、逐步演示引擎与 10 页中文交互样例 |
 | `references/design-guide.md` | 内容结构与排版参考 |
+| `references/interface-reference.md` | PowerPoint 官方界面和交互参考 |
+| `references/interactive-authoring.md` | 逐步内容、交互区域、静态替代与生命周期约定 |
+| `scripts/export_pptx.mjs` | 从逐页 PNG 创建真实 PPTX，并设置首图超链接 |
+| `references/pptx-export.md` | 截图、依赖、导出与超链接验证流程 |
 | `scripts/new_deck.py` | 复制模板，不覆盖已有文件 |
+| `scripts/test_runtime.cjs` | 无依赖的步骤状态机与示例结构测试 |
 
-修改演示交互与样式时，直接编辑模板中的 CSS / JavaScript；修改默认生成策略时编辑 `SKILL.md`。模板内的 `DECK CONTENT START/END` 标记用于定位示例幻灯片。
+模板内 `DECK CONTENT START/END` 标记定位样例幻灯片。每页 `<aside class="speaker-note">` 提供备注。模板内联 CSS、JavaScript 与 SVG，不加载 CDN、远程字体或其他网络依赖。参考页的外部链接只在主动点击时联网。
 
-## 当前验证状态
+## 验证
 
-初版已检查内联 JavaScript 语法，以及复制脚本能生成同内容文件并拒绝覆盖已有文件。完整浏览器交互、全屏、窄屏和打印分页验证尚未完成：开发环境的浏览器策略阻止了 `file://` 访问，后续浏览器验证被中断。请在本地按 `SKILL.md` 的验收清单检查后，再用于正式演示。
+```bash
+node scripts/test_runtime.cjs
+node scripts/test_shortcuts.cjs
+node scripts/test_export_platform.mjs
+```
+
+- macOS：已在 Chrome 检查放映、步骤撤回、模型操作、演示者同步和打印；真实 PowerPoint 打开了 10 页 PPTX，点击第一页成功打开同目录 HTML。
+- Windows：路径和快捷键逻辑有确定性测试；GitHub Actions 在 Windows/macOS 运行脚本测试。原生 Windows Office、浏览器全屏及实际双屏投影仍需目标设备现场验收，CI 不代替这些检查。
+- 导出器：验证真实 PPTX 包、页数、尺寸、图片和首图链接，并拒绝覆盖已有输出或缺失截图。

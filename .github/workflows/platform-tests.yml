@@ -1,0 +1,20 @@
+name: Windows and macOS checks
+on: [push, pull_request]
+jobs:
+  platform:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: node scripts/test_export_platform.mjs
+      - run: node scripts/test_runtime.cjs
+      - run: node scripts/test_shortcuts.cjs
+      - run: python scripts/new_deck.py test-deck.html
