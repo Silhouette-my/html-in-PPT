@@ -13,8 +13,8 @@ description: Generate polished, offline HTML slide decks for university presenta
 2. 先形成叙事：问题 → 主张 → 证据/方法 → 讨论与局限 → 结论。按主题调整，不要机械套章节。每页确定一个 takeaway、一种视觉表达、一段讲稿。
 3. 读取 `references/design-guide.md`；涉及逐步内容或交互时，也读 `references/interactive-authoring.md`。从 `assets/deck-template.html` 复制出最终文件；可执行 `python3 scripts/new_deck.py /path/to/presentation.html`。脚本只复制模板，不会自动撰写内容；必须继续替换所有示例内容。
 4. 保留模板的导航、缩放、放映、演讲者窗口、临时墨迹、计时、概览、打印和键盘逻辑。替换 `DECK CONTENT START/END` 之间的 slides，按主题调整幻灯片 CSS token 和视觉布局，保留工作区的 Fluent 外观。同步更新 `<title>`、工作区 `.pptx` 显示名称、页脚与语言。保留内嵌 PowerPoint favicon；HTML 下载仍用 `.html` 扩展名。不要只换标题就交付。
-5. 按目标平台检查 [双端说明](README.md#windows--macos)；Mac 提供 ⌘Return / ⌘⇧Return，Windows 保留 F5 / Shift+F5；不拦截输入框及其他浏览器组合键。需要 PPTX 时，按 `references/pptx-export.md` 逐页截图并执行 `scripts/export_pptx.mjs`，输出同目录的 HTML + PPTX。PPTX 每页为完整画面，第一页整页链接到 HTML。
-6. 验证页面与放映操作，然后交付 HTML 的可点击链接。简短说明：双击打开、点击开始放映、方向键翻页、Esc 返回、打印可另存 PDF。说明实际完成的检查，不能声称未执行的浏览器测试。
+5. 按目标平台检查 [双端说明](README.md#windows--macos)；Mac 提供 ⌘Return / ⌘⇧Return，Windows 保留 F5 / Shift+F5；不拦截输入框及其他浏览器组合键。需要 PPTX 时，读取 `references/pptx-export.md`，首次执行 `npm ci`、`npm run browser:install`、`npm run doctor`；然后运行 `npm run export -- --html <成品.html> --output-dir <新目录>` 自动截图、导出、校验和打包。无需 Codex 专用依赖，不再手工逐页截图。PPTX 每页为完整画面，第一页整页链接到 HTML。
+6. 检查输出截图及验证记录，并验证页面与放映操作。请求 PPTX 时交付配套 ZIP 和 PPTX，否则交付 HTML 的可点击链接。简短说明：双击打开、点击开始放映、方向键翻页、Esc 返回、打印可另存 PDF。说明实际完成的检查，不能声称未执行的浏览器测试。
 
 ## 交付约定
 

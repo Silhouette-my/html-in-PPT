@@ -1,0 +1,32 @@
+{
+  "name": "html-deck",
+  "version": "1.1.0",
+  "description": "Offline HTML presentations with portable screenshot-based PPTX export",
+  "scripts": {
+    "export": "node scripts/export_deck.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "browser:install": "playwright install chromium --only-shell",
+    "test": "node scripts/test_export_platform.mjs && node scripts/test_runtime.cjs && node scripts/test_shortcuts.cjs && node scripts/test_export_pipeline.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Silhouette-my/html-in-PPT.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Silhouette-my/html-in-PPT/issues"
+  },
+  "homepage": "https://github.com/Silhouette-my/html-in-PPT#readme",
+  "dependencies": {
+    "jszip": "3.10.1",
+    "playwright": "1.58.2",
+    "pptxgenjs": "4.0.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "image-size": "2.0.4"
+  }
+}

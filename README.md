@@ -41,9 +41,25 @@ python3 scripts/new_deck.py presentation.html
 
 没有真实材料时应标明信息缺口，不能编造文献或数据。编辑内容由 AI 改写 HTML 完成；模板没有拖拽编辑、云保存或协作；配套脚本能生成真实的截图式 PPTX。
 
-## 生成配套 PowerPoint
+## 自动生成配套 PowerPoint
 
-按 [PPTX 导出流程](references/pptx-export.md) 捕获每页完整画面，然后运行 `scripts/export_pptx.mjs`。PPTX 每页为对应 HTML 页的截图，第一页整页可点击打开同目录 HTML；搬到别的电脑时两个文件必须一起搬。交互、动画和模拟在 HTML 中运行。PowerPoint 若显示打开外部文件的安全提示，由用户确认。
+在仓库目录中准备 Node.js 22 或 24 LTS，首次安装：
+
+```bash
+npm ci
+npm run browser:install
+npm run doctor
+```
+
+agent 完成 HTML 后，只需一条命令：
+
+```bash
+npm run export -- --html "presentation.html" --output-dir "delivery"
+```
+
+自动逐页截图、生成真实 PPTX、设置第一页链接、校验并打包。`delivery` 是一个新目录，包含 HTML、PPTX、配套 ZIP、截图和验证记录。默认链接指向同目录 HTML，发送时使用 ZIP。不会覆盖已有交付目录。
+
+导出只需项目依赖中的 Playwright Chromium、PptxGenJS 和 ZIP 工具，不再依赖 Codex 专用运行时、Python 或 Office。初次安装需要网络，准备好后自包含 HTML 可离线导出。详细选项、输入要求和已有 PNG 的兼容入口见 [导出流程](references/pptx-export.md)。
 
 顶部显示 `.pptx` 文稿名，浏览器标签使用内嵌 PowerPoint 图标；HTML 下载仍保留正确的 `.html` 扩展名。
 
@@ -93,9 +109,9 @@ git clone https://github.com/Silhouette-my/html-in-PPT.git "$env:USERPROFILE/.co
 1. 工具扫描 `SKILL.md` 的名称和 description。显式写 `$html-deck` 可指定它，也可由工具按任务描述匹配。
 2. 模型读取 skill 正文，按需读取设计、交互和 PPTX 导出参考。它们是生成工作的说明，不是后台常驻程序。
 3. 模型复制 HTML 模板，改写主题内容、视觉和讲稿。模板内的 JavaScript 负责点击推进、缩放、画笔、计时和交互模型；成品运行时不需要 AI。
-4. 请求 PPTX 时，模型通过浏览器逐页截图，再运行导出器。导出器生成真实 OOXML，并把第一页链接指向 HTML，最后验证和交付两份文件。
+4. 请求 PPTX 时，模型运行自动导出命令，脚本通过 Chromium 逐页截图并生成 PPTX。导出器生成真实 OOXML，并把第一页链接指向 HTML，最后验证和交付两份文件。
 
-`new_deck.py` 只复制模板，不会自行写作或自动截图。HTML 制作不依赖 PPTX 工具链；PPTX 导出需要 [导出文档](references/pptx-export.md) 中的 Artifact Tool 运行环境。
+`new_deck.py` 只复制模板，不会自行写作。自动导出命令处理截图和打包，内容与审美由执行模型决定。HTML 制作不依赖 PPTX 工具链；其他有文件和命令执行权限的 agent 也可使用同一套 npm 命令。
 
 ## 开发文件
 
@@ -113,7 +129,8 @@ cd html-in-PPT
 | `references/design-guide.md` | 内容结构与排版参考 |
 | `references/interface-reference.md` | PowerPoint 官方界面和交互参考 |
 | `references/interactive-authoring.md` | 逐步内容、交互区域、静态替代与生命周期约定 |
-| `scripts/export_pptx.mjs` | 从逐页 PNG 创建真实 PPTX，并设置首图超链接 |
+| `scripts/export_pptx.mjs` | 保留已有 PNG → PPTX 的导出入口 |
+| `package.json` / `package-lock.json` | 自动导出、环境检查及锁定的跨平台依赖 |
 | `references/pptx-export.md` | 截图、依赖、导出与超链接验证流程 |
 | `scripts/new_deck.py` | 复制模板，不覆盖已有文件 |
 | `scripts/test_runtime.cjs` | 无依赖的步骤状态机与示例结构测试 |
@@ -123,11 +140,9 @@ cd html-in-PPT
 ## 验证
 
 ```bash
-node scripts/test_runtime.cjs
-node scripts/test_shortcuts.cjs
-node scripts/test_export_platform.mjs
+npm test
 ```
 
 - macOS：已在 Chrome 检查放映、步骤撤回、模型操作、演示者同步和打印；真实 PowerPoint 打开了 10 页 PPTX，点击第一页成功打开同目录 HTML。
-- Windows：路径和快捷键逻辑有确定性测试；GitHub Actions 在 Windows/macOS 运行脚本测试。原生 Windows Office、浏览器全屏及实际双屏投影仍需目标设备现场验收，CI 不代替这些检查。
+- Windows：路径和快捷键逻辑有确定性测试；GitHub Actions 在 Windows/macOS 安装依赖与 Chromium，运行脚本及自动导出测试。原生 Windows Office、浏览器全屏及实际双屏投影仍需目标设备现场验收，CI 不代替这些检查。
 - 导出器：验证真实 PPTX 包、页数、尺寸、图片和首图链接，并拒绝覆盖已有输出或缺失截图。
