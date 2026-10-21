@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>把想法讲清楚 · HTML Deck</title>
+<style>
+:root{--paper:#f6f3ec;--ink:#252822;--muted:#6b6e63;--accent:#bf432c;--line:#dbdcd3;--chrome:#f7f8fa;--slide-scale:1;color-scheme:light}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--ink);background:#e9ebee}button{font:inherit;cursor:pointer;border:1px solid #dfe1e5;background:white;border-radius:7px;padding:9px 13px;color:inherit}button:hover{background:#edf0f3}button:disabled{opacity:.4;cursor:default}button:focus-visible,a:focus-visible{outline:3px solid #2763c9;outline-offset:3px}.primary{background:var(--accent);color:white;border-color:var(--accent)}.primary:hover{background:#a73824}[hidden]{display:none!important}
+.app{height:100dvh;display:grid;grid-template-rows:62px 52px minmax(0,1fr) 34px}.titlebar{display:flex;align-items:center;gap:14px;padding:0 23px;background:#fff;border-bottom:1px solid #e7e8eb}.logo{background:var(--accent);color:white;width:33px;height:33px;border-radius:7px;display:grid;place-items:center;font-weight:800}.filename{font-size:14px;font-weight:650}.filemeta{font-size:11px;color:#7a7f88;margin-top:4px}.badge{font-size:11px;color:#6d7269;border:1px solid #e3e6de;padding:4px 9px;border-radius:20px;margin-left:12px}.titlebar .primary{margin-left:auto;font-size:13px}.toolbar{display:flex;align-items:center;gap:8px;padding:0 24px;background:var(--chrome);border-bottom:1px solid #dcdfe4}.toolbar button{font-size:12px;padding:6px 11px}.toolbar .hint{margin-left:auto;font-size:12px;color:#7c818a}.workarea{display:grid;grid-template-columns:218px minmax(0,1fr);min-height:0}.sidebar{overflow-y:auto;background:#f5f6f8;border-right:1px solid #d9dde3;padding:20px 14px}.sidebar-title{font-size:10px;letter-spacing:2px;color:#828791;margin:0 0 18px 19px}.thumb-row{display:flex;gap:8px;margin-bottom:17px;align-items:flex-start}.thumb-number{font-size:10px;min-width:12px;color:#828791;padding-top:4px}.thumb{padding:0;border-radius:3px;flex:1;min-width:0;overflow:hidden;background:white;text-align:left;border:2px solid transparent;box-shadow:0 1px 5px #00000010}.thumb[aria-current="true"]{border-color:var(--accent)}.mini{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;pointer-events:none}.mini .slide{position:absolute;display:block!important;top:0;left:0;transform-origin:top left;box-shadow:none!important}.main{min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) 112px}.main.notes-hidden{grid-template-rows:minmax(0,1fr)}.stage{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:hidden;padding:30px}.canvas-wrap{position:relative;width:calc(1600px * var(--slide-scale));height:calc(900px * var(--slide-scale));flex-shrink:0}#deck{width:1600px;height:900px;transform:scale(var(--slide-scale));transform-origin:top left}.slide{width:1600px;height:900px;position:relative;overflow:hidden;display:none;padding:76px 88px;background:var(--paper);color:var(--ink);box-shadow:0 10px 35px #00000020}.slide.active{display:block}.speaker-note{display:none}.eyebrow{font-size:19px;font-weight:650;letter-spacing:3px;color:var(--accent);margin-bottom:26px}.slide h1{font-size:106px;letter-spacing:-5px;line-height:1.13;margin:0;font-weight:750}.slide h2{font-size:65px;line-height:1.25;letter-spacing:-2px;margin:0 0 24px;max-width:1360px}.slide h3{font-size:32px;margin:0 0 18px}.lead{font-size:29px;line-height:1.65;color:var(--muted);margin:0;max-width:1100px}.slide-footer{position:absolute;left:88px;right:88px;bottom:34px;border-top:1px solid var(--line);padding-top:17px;display:flex;justify-content:space-between;font-size:17px;color:var(--muted)}.notes{background:#fff;border-top:1px solid #dcdfe4;padding:14px 25px;overflow:auto}.notes-head{font-size:11px;color:#8a8e96;margin-bottom:8px}.notes p{font-size:13px;line-height:1.65;margin:0;color:#555e69}.statusbar{display:flex;align-items:center;padding:0 20px;gap:18px;font-size:11px;color:#777e89;background:var(--chrome);border-top:1px solid #dcdfe4}.statusbar .right{margin-left:auto}.cover{padding-top:92px}.cover .lead{margin-top:33px;width:750px}.cover-meta{margin-top:70px;font-size:20px;line-height:1.8;color:var(--muted)}.cover-art{position:absolute;right:94px;top:162px;width:480px;height:480px}.cover-art .ring{position:absolute;inset:0;border:1px solid #cdd0c4;border-radius:50%}.cover-art .ring.small{inset:65px}.cover-art .tile{position:absolute;left:48px;top:98px;width:390px;height:250px;background:var(--accent);transform:rotate(-9deg);box-shadow:16px 20px 0 #272b23;border:1px solid var(--ink);padding:35px;color:var(--paper)}.tile .tiny{font-size:16px;letter-spacing:3px}.tile .large{font-size:76px;font-weight:700;margin-top:18px}.tile-line{margin-top:15px;width:160px;border-top:2px solid #ffffff80}.cover-art .orbit{position:absolute;width:22px;height:22px;border-radius:50%;background:var(--accent);right:58px;top:45px}.split{display:grid;grid-template-columns:1fr 1fr;gap:65px;margin-top:55px}.statement{font-size:43px;line-height:1.45;margin:0}.rule{height:4px;width:65px;background:var(--accent);margin:25px 0}.list{margin:0;padding:0;list-style:none;font-size:29px;line-height:1.65}.list li{border-bottom:1px solid var(--line);padding:18px 0}.list span{color:var(--accent);font-size:20px;margin-right:20px}.callout{position:absolute;left:88px;right:88px;bottom:120px;padding:22px 28px;background:#e9e9de;font-size:25px}.dark{background:#252b26;color:#f5f2e9}.dark .lead,.dark .slide-footer{color:#c2c9bd}.dark .eyebrow{color:#e5a58e}.dark .slide-footer{border-color:#586052}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:30px;margin-top:75px}.step{border-top:1px solid #687162;padding-top:24px}.step-number{font-size:70px;color:#ce8e78;line-height:1;margin-bottom:38px}.step p{font-size:26px;line-height:1.6;color:#c2c9bd;margin:0}.layout-demo{margin-top:44px;display:grid;grid-template-columns:1.55fr 1fr;gap:38px}.diagram{height:370px;background:#e9eadf;display:grid;place-items:center;padding:25px}.diagram svg{width:100%;height:100%}.annotation{border-left:3px solid var(--accent);padding-left:32px;align-self:center}.annotation p{font-size:28px;line-height:1.7;color:var(--muted)}.chart-layout{display:grid;grid-template-columns:1.6fr 1fr;gap:70px;margin-top:50px}.chart{padding:24px 28px;background:#edede3}.chart-label{font-size:20px;color:var(--muted);margin-bottom:25px}.bar-row{display:grid;grid-template-columns:120px 1fr 60px;align-items:center;gap:16px;margin:25px 0;font-size:25px}.bar-track{background:#dcded2;height:38px}.bar-fill{height:100%;background:#727e62}.bar-fill.accent{background:var(--accent)}.chart-source{font-size:18px;color:var(--muted);margin:30px 0 0}.big-number{font-size:116px;line-height:1;font-weight:750;color:var(--accent);letter-spacing:-7px}.reference-list{list-style:none;padding:0;margin-top:48px}.reference-list li{display:grid;grid-template-columns:65px 1fr;border-top:1px solid var(--line);padding:24px 0;gap:10px;font-size:26px;line-height:1.5}.reference-list small{font-size:20px;color:var(--muted);display:block;margin-top:6px}.reference-list a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:5px}.closing h2{font-size:89px;max-width:1200px;line-height:1.2}.closing .lead{margin-top:40px}.closing-label{display:inline-block;border:1px solid #677260;border-radius:30px;padding:11px 22px;font-size:21px;margin-top:65px;color:#c2c9bd}
+body.presenting .app{display:block;height:100dvh}body.presenting .titlebar,body.presenting .toolbar,body.presenting .sidebar,body.presenting .notes,body.presenting .statusbar{display:none}body.presenting .workarea,body.presenting .main{display:block;height:100dvh}body.presenting .stage{height:100dvh;padding:0;background:#141714}body.presenting .slide{box-shadow:none}.present-controls{position:fixed;z-index:30;right:16px;bottom:13px;display:flex;align-items:center;gap:8px;padding:7px;background:#ffffffed;border-radius:10px;box-shadow:0 3px 20px #0003;opacity:.12;transition:opacity .2s}.present-controls:hover,.present-controls:focus-within{opacity:1}.present-controls button{font-size:12px;padding:6px 10px}.present-controls span{font-size:12px;padding:0 6px}dialog{width:min(1150px,94vw);max-height:88dvh;border:0;border-radius:14px;padding:25px;background:#f3f4f6;color:var(--ink)}dialog::backdrop{background:#111b}.overview-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}.overview-head h2{font-size:19px;margin:0}.overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}.overview-item{min-width:0}.overview-item .thumb{display:block;width:100%}.overview-caption{font-size:12px;line-height:1.6;margin-top:7px;color:#666c75}.toast{position:fixed;bottom:67px;left:50%;transform:translateX(-50%);background:#252b26;color:white;border-radius:8px;padding:10px 17px;font-size:13px;z-index:40}.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.noscript{position:fixed;inset:0;z-index:100;background:white;padding:50px}
+@media(max-width:760px){.app{grid-template-rows:60px 48px minmax(0,1fr) 30px}.workarea{grid-template-columns:110px minmax(0,1fr)}.sidebar{padding:12px 6px}.sidebar-title,.badge,.toolbar .hint,.statusbar .right,.filemeta{display:none}.thumb-row{gap:3px;margin-bottom:10px}.thumb-number{font-size:9px;min-width:10px}.titlebar{padding:0 12px;gap:8px}.filename{font-size:12px}.titlebar .primary{font-size:11px;padding:8px}.toolbar{padding:0 9px;gap:5px}.toolbar button{font-size:11px;padding:6px 8px}.stage{padding:12px}.main{grid-template-rows:minmax(0,1fr) 100px}.notes{padding:10px 12px}.notes p{font-size:12px}.overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.statusbar{padding:0 10px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@page{size:1600px 900px;margin:0}
+@media print{html,body{margin:0!important;padding:0!important;width:1600px!important;background:white!important}.app,.workarea,.main,.stage,.canvas-wrap,#deck{display:block!important;position:static!important;height:auto!important;width:1600px!important;margin:0!important;padding:0!important;overflow:visible!important;transform:none!important}.titlebar,.toolbar,.sidebar,.notes,.statusbar,.present-controls,dialog,.toast,.sr-only{display:none!important}.slide{display:block!important;width:1600px!important;height:900px!important;box-shadow:none!important;break-after:page;break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}.slide:last-child{break-after:auto}.speaker-note{display:none!important}}
+</style>
+</head>
+<body>
+<noscript><div class="noscript">请启用 JavaScript 后重新打开此演示文稿。</div></noscript>
+<div class="app">
+  <header class="titlebar"><div class="logo" aria-hidden="true">H</div><div><div class="filename">把想法讲清楚.html</div><div class="filemeta">HTML Deck · 离线演示文稿</div></div><span class="badge">浏览模式</span><button class="primary" id="present">▶ 开始放映</button></header>
+  <nav class="toolbar" aria-label="演示工具"><button id="overview-open">▦ 概览</button><button id="notes-toggle" aria-pressed="true">讲稿</button><button id="print">打印 / PDF</button><span class="hint">← → 翻页 · Home / End 首尾页</span></nav>
+  <div class="workarea">
+    <nav class="sidebar" aria-label="幻灯片缩略图"><p class="sidebar-title">SLIDES</p><div id="thumbnails"></div></nav>
+    <main class="main" id="main">
+      <div class="stage" id="stage" tabindex="-1"><div class="canvas-wrap"><div id="deck" aria-label="幻灯片画布">
+<!-- DECK CONTENT START: replace the seven sample sections below. -->
+<section class="slide cover active" data-title="把想法讲清楚">
+  <div class="eyebrow">HTML DECK / A PRESENTATION STARTER</div>
+  <h1>把想法<br>讲清楚<span style="color:var(--accent)">。</span></h1>
+  <p class="lead">用 HTML 的表达力，<br>保留幻灯片熟悉的演讲节奏。</p>
+  <div class="cover-meta">大学课堂演示 · 可替换模板<br>你的姓名 / 课程名称 / 日期</div>
+  <div class="cover-art" aria-hidden="true"><div class="ring"></div><div class="ring small"></div><div class="tile"><div class="tiny">ONE IDEA AT A TIME</div><div class="large">Aa ↗</div><div class="tile-line"></div></div><div class="orbit"></div></div>
+  <footer class="slide-footer"><span>从一份 HTML，开始下一次 pre</span><span>01 / 07</span></footer>
+  <aside class="speaker-note">约 20 秒。这个样例展示的是演示方式，不是研究报告。介绍：我们希望用网页的视觉能力做幻灯片，同时保留熟悉的翻页、缩略图与放映操作。</aside>
+</section>
+<section class="slide" data-title="一个页面，只讲一个重点">
+  <div class="eyebrow">01 / THE IDEA</div><h2>一个页面，只讲一个重点。</h2><p class="lead">先想听众要记住什么，再决定页面上放什么。</p>
+  <div class="split"><div><p class="statement">你负责提出观点，<br>画面负责让观点<br><span style="color:var(--accent)">更容易被理解。</span></p><div class="rule"></div><p class="lead">讲述细节，留给你的声音。</p></div><ul class="list"><li><span>01</span>标题说出核心判断</li><li><span>02</span>图像或证据解释判断</li><li><span>03</span>讲稿补充过程与边界</li></ul></div>
+  <div class="callout">一个实用检查：看完这一页，听众能用一句话复述什么？</div>
+  <footer class="slide-footer"><span>设计建议 · 并非实验结论</span><span>02 / 07</span></footer><aside class="speaker-note">约 45 秒。页面不必承载逐字讲稿。先给出观点，再用证据或示意解释；复杂内容可拆成几页。这里的排版原则是实践建议，不应作为已有研究结论引用。</aside>
+</section>
+<section class="slide dark" data-title="把材料变成故事">
+  <div class="eyebrow">02 / THE STRUCTURE</div><h2>材料不是故事，组织之后才是。</h2><p class="lead">从“我查到了什么”，走向“我想说明什么”。</p>
+  <div class="flow"><div class="step"><div class="step-number">01</div><h3>提出问题</h3><p>为什么值得讨论？<br>与听众有什么关系？</p></div><div class="step"><div class="step-number">02</div><h3>给出证据</h3><p>材料支持什么观点？<br>依据从哪里来？</p></div><div class="step"><div class="step-number">03</div><h3>解释边界</h3><p>还有什么不能确定？<br>可能有哪些反例？</p></div><div class="step"><div class="step-number">04</div><h3>留下结论</h3><p>最该记住的一句话？<br>下一步能做什么？</p></div></div>
+  <footer class="slide-footer"><span>问题 → 证据 → 边界 → 结论</span><span>03 / 07</span></footer><aside class="speaker-note">约 50 秒。按从左到右的顺序讲。这个结构适合许多课堂报告，但不是强制章节。实验课可突出方法与结果，文献课可突出观点与分歧。过渡：结构确定之后，再选择适合内容的画面。</aside>
+</section>
+<section class="slide" data-title="用关系图代替段落堆叠">
+  <div class="eyebrow">03 / VISUAL EXPLANATION</div><h2>有关系的内容，用图来讲。</h2><p class="lead">HTML 可以把流程、结构和比较，直接变成可读的画面。</p>
+  <div class="layout-demo"><div class="diagram"><svg viewBox="0 0 800 310" role="img" aria-label="材料经过组织形成论点，再通过设计形成表达的三步流程"><path d="M220 155H308M490 155H578" stroke="#949d87" stroke-width="3"/><path d="m296 145 12 10-12 10m270-20 12 10-12 10" fill="none" stroke="#949d87" stroke-width="3"/><rect x="20" y="65" width="200" height="180" rx="4" fill="#f6f3ec"/><rect x="308" y="65" width="182" height="180" rx="4" fill="#252b26"/><rect x="578" y="65" width="200" height="180" rx="4" fill="#bf432c"/><g text-anchor="middle" font-size="32" font-family="sans-serif"><text x="120" y="143" fill="#252822">材料</text><text x="399" y="143" fill="#f6f3ec">论点</text><text x="678" y="143" fill="#fff">表达</text></g><g text-anchor="middle" font-size="20" font-family="sans-serif"><text x="120" y="184" fill="#6b6e63">阅读 / 观察</text><text x="399" y="184" fill="#c2c9bd">筛选 / 组织</text><text x="678" y="184" fill="#ffe4d9">视觉 / 讲述</text></g></svg></div><div class="annotation"><h3>视觉不只是装饰。</h3><p>箭头表达顺序，<br>分组表达归属，<br>大小与颜色表达重点。</p><p>先确定关系，再选择图形。</p></div></div>
+  <footer class="slide-footer"><span>结构示意 · SVG 矢量绘制</span><span>04 / 07</span></footer><aside class="speaker-note">约 45 秒。用图示讲述“材料、论点、表达”的依赖关系。强调图形必须编码信息。这一页的 SVG 没有外部依赖，离线可用，打印时也会保留。</aside>
+</section>
+<section class="slide" data-title="让图表有依据">
+  <div class="eyebrow">04 / EVIDENCE & HONESTY</div><h2>图表要好看，更要说得清来源。</h2><p class="lead">下面只演示排版：这些数值不代表任何真实实验。</p>
+  <div class="chart-layout"><div class="chart" role="img" aria-label="示意数据，非真实实验。方案 A 42 分，B 65 分，C 78 分；满分 100 分。"><div class="chart-label">示意评分 / 分 · 范围 0–100</div><div class="bar-row"><span>方案 A</span><div class="bar-track"><div class="bar-fill" style="width:42%"></div></div><span>42</span></div><div class="bar-row"><span>方案 B</span><div class="bar-track"><div class="bar-fill" style="width:65%"></div></div><span>65</span></div><div class="bar-row"><span>方案 C</span><div class="bar-track"><div class="bar-fill accent" style="width:78%"></div></div><span>78</span></div><p class="chart-source">来源：人为构造的模板示例，不可用于研究结论。</p></div><div style="padding-top:14px"><div class="big-number">3<span style="font-size:36px;letter-spacing:0"> 个问题</span></div><ul class="list" style="font-size:26px;margin-top:18px"><li>测量的是什么？</li><li>数据来自哪里？</li><li>结论有多大把握？</li></ul></div></div>
+  <footer class="slide-footer"><span>请在正式报告中替换为真实、可核查的数据</span><span>05 / 07</span></footer><aside class="speaker-note">约 45 秒。明确告知听众这是虚构的图表样例，不得引用其数值。正式报告中补充实际数据、单位、采样方法、样本量和来源。不要根据三个示例数值推导因果。</aside>
+</section>
+<section class="slide" data-title="把出处留给听众">
+  <div class="eyebrow">05 / REFERENCES</div><h2>关键的出处，应该可以追溯。</h2><p class="lead">这里列出与模板技术相关的参考文档；正式 pre 请换成你的学术来源。</p>
+  <ol class="reference-list"><li><span>01</span><div><a href="https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API" target="_blank" rel="noopener noreferrer">MDN · Fullscreen API</a><small>全屏接口说明 · developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API</small></div></li><li><span>02</span><div><a href="https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Printing" target="_blank" rel="noopener noreferrer">MDN · Printing</a><small>打印样式说明 · developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Printing</small></div></li><li><span>03</span><div>你的课程材料 / 论文 / 数据集<small>待替换：作者、年份、标题、出版信息，以及可核查的 URL / DOI。</small></div></li></ol>
+  <footer class="slide-footer"><span>模板无联网依赖；打开外部参考链接需要网络</span><span>06 / 07</span></footer><aside class="speaker-note">此页备查，不必逐条朗读。模板只列出技术文档，不假装存在支持排版建议的实证研究。正式报告要把论据与对应参考文献逐项连接起来。</aside>
+</section>
+<section class="slide dark closing" data-title="让听众带走一个想法">
+  <div class="eyebrow">06 / TAKEAWAY</div><h2>好的 pre，<br>让听众带走一个想法。</h2><p class="lead">清楚的观点 · 有依据的内容 · 恰到好处的视觉</p><div class="closing-label">现在，把它换成你的主题。 ↗</div>
+  <footer class="slide-footer"><span>THANK YOU / 欢迎讨论</span><span>07 / 07</span></footer><aside class="speaker-note">约 20 秒。最后重申：我们要做的是让内容更容易理解。用一句话收束，再邀请提问。这是模板演示的结尾；正式作业应换成你的研究结论和后续问题。</aside>
+</section>
+<!-- DECK CONTENT END -->
+      </div></div></div>
+      <aside class="notes" id="notes-panel" aria-label="当前页讲稿"><div class="notes-head">讲稿 · 仅在工作区显示</div><p id="note-text"></p></aside>
+    </main>
+  </div>
+  <footer class="statusbar"><span id="page-status"></span><span>16:9</span><span class="right">本地 HTML · 无需网络</span><span id="zoom"></span></footer>
+</div>
+<div class="present-controls" id="present-controls" hidden><button id="prev" aria-label="上一页">←</button><span id="present-status"></span><button id="next" aria-label="下一页">→</button><button id="exit">退出放映 Esc</button></div>
+<dialog id="overview" aria-labelledby="overview-title"><div class="overview-head"><h2 id="overview-title">幻灯片概览</h2><button id="overview-close" autofocus>关闭 Esc</button></div><div class="overview-grid" id="overview-grid"></div></dialog>
+<div class="sr-only" role="status" aria-live="polite" id="announcement"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const slides = [...document.querySelectorAll('#deck > .slide')];
+  const overview = $('overview');
+  let current = 0, presenting = false, hadFullscreen = false, toastTimer;
+  const miniatureObserver = new ResizeObserver(entries => entries.forEach(({target,contentRect}) => {
+    target.firstElementChild.style.transform = `scale(${contentRect.width / 1600})`;
+  }));
+  function makeThumb(slide, index) {
+    const button = document.createElement('button');
+    button.className = 'thumb';
+    button.setAttribute('aria-label', `第 ${index + 1} 页：${slide.dataset.title || '幻灯片'}`);
+    const mini = document.createElement('div'); mini.className = 'mini'; mini.setAttribute('aria-hidden','true'); mini.inert = true;
+    const clone = slide.cloneNode(true); clone.classList.remove('active'); clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    clone.querySelectorAll('.speaker-note,script,iframe,video,audio').forEach(el => el.remove());
+    mini.append(clone); button.append(mini); miniatureObserver.observe(mini);
+    button.addEventListener('click', () => { go(index); if (overview.open) overview.close(); });
+    return button;
+  }
+  const thumbnails = slides.map((slide,index) => {
+    const row = document.createElement('div'); row.className='thumb-row';
+    const number = document.createElement('span'); number.className='thumb-number'; number.textContent=index+1;
+    const button=makeThumb(slide,index); row.append(number,button); $('thumbnails').append(row);
+    const item=document.createElement('div'); item.className='overview-item'; item.append(makeThumb(slide,index));
+    const caption=document.createElement('div'); caption.className='overview-caption'; caption.textContent=`${String(index+1).padStart(2,'0')} / ${slide.dataset.title || '幻灯片'}`; item.append(caption); $('overview-grid').append(item);
+    return button;
+  });
+  const overviewButtons=[...$('overview-grid').querySelectorAll('button.thumb')];
+  function fit() {
+    const stage=$('stage'),style=getComputedStyle(stage);
+    const width=stage.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+    const height=stage.clientHeight-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom);
+    const scale=Math.max(.01,Math.min(width/1600,height/900));
+    document.documentElement.style.setProperty('--slide-scale',scale);
+    $('zoom').textContent=`${Math.round(scale*100)}%`;
+  }
+  function go(index, updateHash=true) {
+    current=Math.max(0,Math.min(slides.length-1,index));
+    slides.forEach((slide,i)=>{slide.classList.toggle('active',i===current);slide.setAttribute('aria-hidden',String(i!==current));slide.inert=i!==current;});
+    thumbnails.forEach((thumb,i)=>thumb.setAttribute('aria-current',String(i===current)));
+    overviewButtons.forEach((thumb,i)=>thumb.setAttribute('aria-current',String(i===current)));
+    const status=`${current+1} / ${slides.length}`;
+    $('page-status').textContent=`幻灯片 ${status}`; $('present-status').textContent=status;
+    $('note-text').textContent=slides[current].querySelector('.speaker-note')?.textContent.trim() || '此页暂无讲稿。';
+    $('prev').disabled=current===0; $('next').disabled=current===slides.length-1;
+    $('announcement').textContent=`第 ${current+1} 页，共 ${slides.length} 页：${slides[current].dataset.title || ''}`;
+    if(updateHash){try{history.replaceState(null,'',`#slide-${current+1}`);}catch{ /* file previews may restrict History API */ }}
+    thumbnails[current].scrollIntoView({block:'nearest',behavior:'instant'});
+  }
+  function fromHash(){const match=location.hash.match(/^#slide-(\d+)$/);go(match ? Number(match[1])-1 : 0,false);}
+  function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,3500);}
+  async function start(){
+    presenting=true;document.body.classList.add('presenting');$('present-controls').hidden=false;fit();$('stage').focus();
+    try{if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();hadFullscreen=!!document.fullscreenElement;}else{toast('已进入窗口内放映。');}}
+    catch{toast('当前浏览器未允许全屏，已进入窗口内放映。');}
+  }
+  async function stop(){presenting=false;hadFullscreen=false;document.body.classList.remove('presenting');$('present-controls').hidden=true;if(document.fullscreenElement){try{await document.exitFullscreen();}catch{}}fit();$('present').focus();}
+  document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement){hadFullscreen=true;}else if(presenting&&hadFullscreen){stop();}fit();});
+  $('present').addEventListener('click',start);$('exit').addEventListener('click',stop);
+  $('prev').addEventListener('click',()=>go(current-1));$('next').addEventListener('click',()=>go(current+1));
+  $('notes-toggle').addEventListener('click',()=>{const hidden=!$('notes-panel').hidden;$('notes-panel').hidden=hidden;$('main').classList.toggle('notes-hidden',hidden);$('notes-toggle').setAttribute('aria-pressed',String(!hidden));fit();});
+  $('overview-open').addEventListener('click',()=>overview.showModal());$('overview-close').addEventListener('click',()=>overview.close());
+  $('print').addEventListener('click',()=>window.print());window.addEventListener('hashchange',fromHash);
+  document.addEventListener('keydown',event=>{
+    if(event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||event.isComposing)return;
+    if(event.target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])'))return;
+    if(overview.open)return;
+    if(event.key==='Escape'&&presenting){event.preventDefault();stop();return;}
+    if(event.key===' '&&event.target.closest('button,a'))return;
+    const actions={ArrowRight:()=>go(current+1),ArrowDown:()=>go(current+1),PageDown:()=>go(current+1),' ':()=>go(current+1),ArrowLeft:()=>go(current-1),ArrowUp:()=>go(current-1),PageUp:()=>go(current-1),Home:()=>go(0),End:()=>go(slides.length-1)};
+    if(actions[event.key]){event.preventDefault();actions[event.key]();}
+  });
+  let touchStart=null;
+  $('stage').addEventListener('touchstart',event=>{if(event.touches.length===1&&!event.target.closest('a,button,input,textarea,select'))touchStart={x:event.touches[0].clientX,y:event.touches[0].clientY};else touchStart=null;},{passive:true});
+  $('stage').addEventListener('touchend',event=>{if(!touchStart)return;const dx=event.changedTouches[0].clientX-touchStart.x,dy=event.changedTouches[0].clientY-touchStart.y;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5)go(current+(dx<0?1:-1));touchStart=null;},{passive:true});
+  new ResizeObserver(fit).observe($('stage'));window.addEventListener('resize',fit);fromHash();fit();
+})();
+</script>
+</body>
+</html>
