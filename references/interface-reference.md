@@ -11,7 +11,7 @@
 5. **审阅**：审阅演示文稿、校对、辅助功能、修订和批注操作。
 6. **放映控制条**：左下紧凑深灰条，上一页、页码、下一页、概览、画笔、黑屏、演示者与更多。
 
-共有结构：完整标签顺序“文件、开始、插入、绘图、设计、切换、动画、幻灯片放映、审阅、视图、帮助”；标题行居中搜索，标签右侧批注/跟进/演示/编辑/分享。保留原有七页样例内容，不用截图中的空白标题页替换真实文稿。
+共有结构：完整标签顺序“文件、开始、插入、绘图、设计、切换、动画、幻灯片放映、审阅、视图、帮助”；标题行居中搜索，标签右侧批注/跟进/演示/编辑/分享。模板当前有 10 页可运行内容，不用参考截图中的空白标题页替换真实文稿。
 
 以 1991×1150 的截图为几何参考：标题行约 44px，标签行 38px，功能区约 40px；侧栏约 253px，备注条 32px，状态栏 23px；画布区上下留白约 64px。小窗口按断点缩减边距，画布仍为等比例 16:9。浅灰工作区使用 `#f5f5f5`，选中缩略图使用橙红边框。
 
@@ -27,4 +27,4 @@
 - [Start the presentation and see your notes in Presenter view](https://support.microsoft.com/en-us/powerpoint/training/start-the-presentation-and-see-your-notes-in-presenter-view)：演讲者视图的当前页、下一页、备注、计时与双屏使用。
 - [Use keyboard shortcuts to deliver PowerPoint presentations](https://support.microsoft.com/en-us/accessibility/powerpoint/use-keyboard-shortcuts-to-deliver-powerpoint-presentations)：翻页、指定页跳转、黑白屏和指针工具的操作参考。
 
-按用户的本地自用要求，界面使用 PowerPoint 名称和微软官方图标。图标来源为 [Microsoft Office CDN](https://res.cdn.office.net/files/fabric-cdn-prod_20251117.001/assets/brand-icons/product/svg/powerpoint_16x1.svg)，以 SVG data URI 内嵌，无运行时网络请求。不显示虚假的 Microsoft 账户或云端保存状态。搜索执行本地可用命令并定位幻灯片；文件菜单提供真实下载、打印、重命名和信息。未实现的编辑、协作和云端功能保留截图位置但禁用，并说明离线浏览模式不支持。浏览器窗口与投屏能力由浏览器提供。
+界面参考 Microsoft PowerPoint，并使用其名称和官方图标；本项目是独立实现。图标来源为 [Microsoft Office CDN](https://res.cdn.office.net/files/fabric-cdn-prod_20251117.001/assets/brand-icons/product/svg/powerpoint_16x1.svg)，以 SVG data URI 内嵌，无运行时网络请求。不显示虚假的 Microsoft 账户或云端保存状态。搜索执行本地可用命令并定位幻灯片；文件菜单提供真实下载、打印、重命名和信息。未实现的编辑、协作和云端功能保留截图位置但禁用，并说明离线浏览模式不支持。浏览器窗口与投屏能力由浏览器提供。

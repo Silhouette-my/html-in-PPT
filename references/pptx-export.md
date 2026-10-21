@@ -4,7 +4,7 @@
 
 ## 首次准备
 
-安装 Node.js 22 或 24 LTS，然后执行：
+安装 Node.js 22+（推荐 22 或 24 LTS），然后执行：
 
 ```bash
 npm ci
@@ -40,9 +40,9 @@ delivery/
   validation.json
 ```
 
-PPTX 每页为一张等比例完整截图。所有分步内容都显示，物理模拟和 CSS 3D 使用模板定义的静态替代。模型的交互能力仍在 HTML 中。`slides` 可用于视觉检查；清单及验证记录用于确认页数、顺序、尺寸、图片和首页链接。
+自动导出会重新加载原始 HTML，使用文稿定义的初始参数，不读取其他浏览器窗口里的临时状态。PPTX 每页为一张等比例完整截图。所有分步内容都显示，物理模拟和 CSS 3D 使用模板定义的静态替代。模型的交互能力仍在 HTML 中。`slides` 可用于视觉检查；清单及验证记录用于确认页数、顺序、尺寸、图片和首页链接。
 
-交付优先提供 ZIP。解压后保持 HTML 与 PPTX 在同一目录，在桌面 PowerPoint 中放映并点击第一页即可进入 HTML。macOS 首次打开可能要求授予该 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标文件后操作，不关闭全局安全保护。
+ZIP 只包含 HTML 和 PPTX，截图、清单和验证记录留在输出目录供检查。交付优先提供 ZIP。解压后保持 HTML 与 PPTX 在同一目录，在桌面 PowerPoint 中放映并点击第一页即可进入 HTML。macOS 首次打开可能要求授予该 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标文件后操作，不关闭全局安全保护。
 
 若用户已提供网页地址，可追加 `--url https://example.com/deck.html`。脚本不会上传或发布 HTML。
 
@@ -65,3 +65,33 @@ node scripts/export_pptx.mjs --slides slides --html presentation.html --output p
 ## 验收
 
 自动校验通过后，仍需看截图是否有内容裁切、字体问题或不合理布局。导出脚本负责忠实捕获已完成的页面，不替 agent 判断内容或审美。桌面 PowerPoint 的实际链接跳转与权限提示需要在目标设备确认，结构测试不代替 Office 真机测试。
+
+## 常见问题
+
+### 提示 Export dependencies are missing
+
+确认当前目录包含本项目的 `package.json`，执行 `npm ci`，再运行 `npm run doctor`。只安装了 skill 文件，不代表 npm 依赖已安装。
+
+### 提示 Chromium could not start
+
+执行 `npm run browser:install`，然后重跑 `npm run doctor`。Linux 若缺少系统库，按 doctor 提示使用 `npx playwright install --with-deps chromium`；系统依赖安装可能需要管理员权限。Windows/macOS 不需要这一步。
+
+### 提示 Refusing to overwrite
+
+选择新的 `--output-dir`，如 `delivery-v2`。已有 PNG 的导出入口则更换 `--output` 文件名。先检查已有成果，不直接清空目录。
+
+### 提示 Only self-contained HTML is supported
+
+页面使用了外部脚本、字体、图片或本地旁挂文件，或者图片无法解码。让 agent 按错误中列出的资源修正：脚本/样式内联，图片等嵌入 data URL。不要只删除检查而把缺失资源交付出去。
+
+### 提示 Expected html-deck template
+
+此命令面向本项目模板，不是任意网页转 PPTX 工具。保留 `#deck > .slide` 结构，以及 `?export=1#slide-N` 的导出模式。自定义内容放在模板的内容区域，不删除演示引擎。
+
+### 导出成功，但字体或画面不对
+
+先查看输出目录的 `slides/`。截图由运行导出的电脑生成，系统字体不同会影响排版；调整 HTML 字体与布局后重新导出。脚本的尺寸和文件结构检查不替代视觉检查。
+
+### 首页点击没有打开 HTML
+
+先确认已解压 ZIP、两份文件在同一目录，并在桌面 PowerPoint 的放映模式点击第一页。编辑模式的点击行为取决于 PowerPoint。按目标系统提示确认文件权限；网页 Office 或学校设备策略可能不允许打开本地 HTML，此时可直接打开 HTML 或使用静态 PPTX。

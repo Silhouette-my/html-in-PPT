@@ -13,7 +13,7 @@ description: Generate polished, offline HTML slide decks for university presenta
 2. 先形成叙事：问题 → 主张 → 证据/方法 → 讨论与局限 → 结论。按主题调整，不要机械套章节。每页确定一个 takeaway、一种视觉表达、一段讲稿。
 3. 读取 `references/design-guide.md`；涉及逐步内容或交互时，也读 `references/interactive-authoring.md`。从 `assets/deck-template.html` 复制出最终文件；可执行 `python3 scripts/new_deck.py /path/to/presentation.html`。脚本只复制模板，不会自动撰写内容；必须继续替换所有示例内容。
 4. 保留模板的导航、缩放、放映、演讲者窗口、临时墨迹、计时、概览、打印和键盘逻辑。替换 `DECK CONTENT START/END` 之间的 slides，按主题调整幻灯片 CSS token 和视觉布局，保留工作区的 Fluent 外观。同步更新 `<title>`、工作区 `.pptx` 显示名称、页脚与语言。保留内嵌 PowerPoint favicon；HTML 下载仍用 `.html` 扩展名。不要只换标题就交付。
-5. 按目标平台检查 [双端说明](README.md#windows--macos)；Mac 提供 ⌘Return / ⌘⇧Return，Windows 保留 F5 / Shift+F5；不拦截输入框及其他浏览器组合键。需要 PPTX 时，读取 `references/pptx-export.md`，首次执行 `npm ci`、`npm run browser:install`、`npm run doctor`；然后运行 `npm run export -- --html <成品.html> --output-dir <新目录>` 自动截图、导出、校验和打包。无需 Codex 专用依赖，不再手工逐页截图。PPTX 每页为完整画面，第一页整页链接到 HTML。
+5. 按目标平台检查 [双端放映说明](references/presenting.md#windows--macos-快捷键)；Mac 提供 ⌘Return / ⌘⇧Return，Windows 保留 F5 / Shift+F5；不拦截输入框及其他浏览器组合键。需要 PPTX 时，读取 `references/pptx-export.md`，首次执行 `npm ci`、`npm run browser:install`、`npm run doctor`；然后运行 `npm run export -- --html <成品.html> --output-dir <新目录>` 自动截图、导出、校验和打包。无需 Codex 专用依赖，不再手工逐页截图。PPTX 每页为完整画面，第一页整页链接到 HTML。
 6. 检查输出截图及验证记录，并验证页面与放映操作。请求 PPTX 时交付配套 ZIP 和 PPTX，否则交付 HTML 的可点击链接。简短说明：双击打开、点击开始放映、方向键翻页、Esc 返回、打印可另存 PDF。说明实际完成的检查，不能声称未执行的浏览器测试。
 
 ## 交付约定
@@ -26,7 +26,7 @@ description: Generate polished, offline HTML slide decks for university presenta
 - 保留独立演讲者窗口（当前页、下一页、备注、同步导航、计时暂停/继续/重置），弹窗被阻止时显示可操作的错误。只共享听众放映窗口，不共享演讲者窗口。计时首次放映启动，结束暂停，重新放映继续累计；新一轮排练可重置。
 - 保留放映中的 B/W 黑白屏、L 激光笔、P 画笔、E 清除本页墨迹。墨迹按页暂存于内存，关闭页面即丢失，不写入下载的 HTML 或打印的 PDF；不声称持久化保存。
 - 放映模式只显示当前幻灯片及必要控制，不显示讲稿。全屏 API 被阻止时保留窗口内放映。不要把全屏 API 成功作为导航的前提。
-- 工作区以 `references/interface-reference.md` 中用户提供的 PowerPoint 网页版截图为视觉基准，保留完整选项卡次序、紧凑功能区、文件下拉菜单和底部备注条。本项目按用户的本地自用要求使用 PowerPoint 名称和内嵌官方图标；未实现的编辑或云服务控件置灰并说明原因，不能显示虚假的登录、云保存或协作状态。实际演示操作必须可用。内容编辑与持久化保存仍未实现；PPTX 通过配套截图导出脚本生成，不将 HTML 文件改扩展名冒充 PPTX。没有同尺寸截图的差异检查，不宣称像素完全一致。
+- 工作区以 `references/interface-reference.md` 中用户提供的 PowerPoint 网页版截图为视觉基准，保留完整选项卡次序、紧凑功能区、文件下拉菜单和底部备注条。界面使用 PowerPoint 名称和内嵌官方图标，来源见界面参考；未实现的编辑或云服务控件置灰并说明原因，不能显示虚假的登录、云保存或协作状态。实际演示操作必须可用。内容编辑与持久化保存仍未实现；PPTX 通过配套截图导出脚本生成，不将 HTML 文件改扩展名冒充 PPTX。没有同尺寸截图的差异检查，不宣称像素完全一致。
 - 打印每页一张横向幻灯片，显示所有步骤，隐藏工作区、按钮、备注、临时墨迹与黑白屏遮罩，即使放映正在黑屏仍打印全部页面。Canvas/3D 提供有文字说明的 `.static-effect` SVG 替代，预览和打印不依赖运行中的动画。PDF 保留静态内容，交互和动画不会成为 PDF 动画。不要把“浏览器打印”称为原生 PPTX 导出。“下载 HTML”输出原始文稿及完整程序/内嵌资源，不包含临时状态。
 - 每个交互元素具备可读名称、焦点态和键盘支持。支持 reduced motion。隐藏页面不得进入 Tab 顺序；快捷键不得截获输入框、可编辑区域或浏览器组合键。
 
