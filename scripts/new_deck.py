@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Copy the self-contained starter deck. Content authoring is a separate step."""
 import argparse
+import sys
 from pathlib import Path
+
+# Windows redirected consoles may default to cp1252, which cannot print Chinese.
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 parser = argparse.ArgumentParser(description="创建离线 HTML 幻灯片模板（随后替换示例内容）")
 parser.add_argument("output", type=Path, help="输出 .html 文件")
