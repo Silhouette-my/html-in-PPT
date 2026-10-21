@@ -29,8 +29,8 @@ python3 scripts/new_deck.py presentation.html
 ## 本地继续开发
 
 ```bash
-git clone https://github.com/Silhouette-my/html-deck.git
-cd html-deck
+git clone https://github.com/Silhouette-my/html-in-PPT.git
+cd html-in-PPT
 ```
 
 直接用浏览器打开 `assets/deck-template.html` 查看样例，无需安装 Node.js 或启动服务。创建副本的脚本需要 Python 3。
