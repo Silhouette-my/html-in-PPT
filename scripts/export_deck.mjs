@@ -9,6 +9,8 @@ import { doctor } from './doctor.mjs';
 const USAGE = 'npm run export -- --html <self-contained-deck.html> --output-dir <new-folder> [--url <https/http/file-url>]';
 export async function exportDeck(options) {
   const source = path.resolve(options['--html']), output = path.resolve(options['--output-dir']);
+  // Optional: reuse an installed Chrome/Edge when Playwright's Chromium is unavailable.
+  const browserChannel = process.env.HTML_DECK_BROWSER_CHANNEL;
   if (path.extname(source).toLowerCase() !== '.html') throw new Error('--html must name an HTML file.');
   const html = await fs.readFile(source, 'utf8');
   try { await fs.access(output); throw new Error(`Refusing to overwrite output directory: ${output}`); } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -27,7 +29,7 @@ export async function exportDeck(options) {
     });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
     const address = `http://127.0.0.1:${server.address().port}/deck.html`;
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, ...(browserChannel ? { channel: browserChannel } : {}) });
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
     const failures = [], errors = [];
     page.on('pageerror', error => errors.push(error.message));
