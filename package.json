@@ -6,7 +6,8 @@
     "export": "node scripts/export_deck.mjs",
     "doctor": "node scripts/doctor.mjs",
     "browser:install": "playwright install chromium --only-shell",
-    "test": "node scripts/test_export_platform.mjs && node scripts/test_runtime.cjs && node scripts/test_shortcuts.cjs && node scripts/test_export_pipeline.mjs"
+    "test": "node scripts/test_export_platform.mjs && node scripts/test_runtime.cjs && node scripts/test_shortcuts.cjs && node scripts/test_dualscreen.cjs && node scripts/test_portable_tools.mjs && node scripts/test_export_pipeline.mjs",
+    "present": "node scripts/present.mjs"
   },
   "repository": {
     "type": "git",

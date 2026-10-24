@@ -13,7 +13,7 @@ description: Generate polished, offline HTML slide decks for university presenta
 2. 先形成叙事：问题 → 主张 → 证据/方法 → 讨论与局限 → 结论。按主题调整，不要机械套章节。每页确定一个 takeaway、一种视觉表达、一段讲稿。
 3. 读取 `references/design-guide.md`；涉及逐步内容或交互时，也读 `references/interactive-authoring.md`。从 `assets/deck-template.html` 复制出最终文件；可执行 `python3 scripts/new_deck.py /path/to/presentation.html`。脚本只复制模板，不会自动撰写内容；必须继续替换所有示例内容。
 4. 保留模板的导航、缩放、放映、演讲者窗口、临时墨迹、计时、概览、打印和键盘逻辑。替换 `DECK CONTENT START/END` 之间的 slides，按主题调整幻灯片 CSS token 和视觉布局，保留工作区的 Fluent 外观。同步更新 `<title>`、工作区 `.pptx` 显示名称、页脚与语言。保留内嵌 PowerPoint favicon；HTML 下载仍用 `.html` 扩展名。不要只换标题就交付。
-5. 按目标平台检查 [双端放映说明](references/presenting.md#windows--macos-快捷键)；Mac 提供 ⌘Return / ⌘⇧Return，Windows 保留 F5 / Shift+F5；不拦截输入框及其他浏览器组合键。需要 PPTX 时，读取 `references/pptx-export.md`，首次执行 `npm ci`、`npm run browser:install`、`npm run doctor`；然后运行 `npm run export -- --html <成品.html> --output-dir <新目录>` 自动截图、导出、校验和打包。无需 Codex 专用依赖，不再手工逐页截图。PPTX 每页为完整画面，第一页整页链接到 HTML。
+5. 按目标平台检查 [双端放映说明](references/presenting.md#windows--macos-快捷键)；Mac 提供 ⌘Return / ⌘⇧Return，Windows 保留 F5 / Shift+F5；不拦截输入框及其他浏览器组合键。需要 PPTX 时，读取 `references/pptx-export.md`，首次执行 `npm ci`、`npm run browser:install`、`npm run doctor`；然后运行 `npm run export -- --html <成品.html> --output-dir <新目录>` 自动截图、导出、校验和打包；重复导出可用 `--auto-version <目录前缀>` 分配新编号，不删除旧成果。无需 Codex 专用依赖，不再手工逐页截图。PPTX 每页为完整画面，第一页整页链接到 HTML。
 6. 检查输出截图及验证记录，并验证页面与放映操作。请求 PPTX 时交付配套 ZIP 和 PPTX，否则交付 HTML 的可点击链接。简短说明：双击打开、点击开始放映、方向键翻页、Esc 返回、打印可另存 PDF。说明实际完成的检查，不能声称未执行的浏览器测试。
 
 ## 交付约定
@@ -22,8 +22,9 @@ description: Generate polished, offline HTML slide decks for university presenta
 - 这是演示文稿，不是长网页。固定 1600×900 的设计画布，按可用空间等比缩放，不拉伸、不裁切、不靠缩小正文塞入过多内容。
 - 必须有真实缩略图、当前页高亮、页码、上一页/下一页、从头/当前页放映、Esc 退出、方向键与 Space/PageUp/PageDown、Home/End、数字 + Enter 跳页、概览、备注、缩放与适应窗口。模板已提供这些功能。
 - 用 `data-step="1"`、`data-step="2"` 声明按组揭示的内容。放映时背景点击、键盘、控制条和演示者窗口共用状态机：先显示下一组再翻页；反向先撤回，跨页后显示上一页完整内容。工作区、缩略图和下一页预览显示全部内容。每次由工作区进入放映或直接跳页，目标页步骤重置。动画标签的逐步显示开关与重置、切换标签的淡入开关都必须保留。
-- 交互图表、仿真或 CSS 3D 必须有真正可操作的参数及可读数值，明确模型、单位和示意性质。交互根标记 `data-interactive`；输入、链接、媒体、拖动、选中文字与画笔不得误触下一步。仿真只在当前页可见且用户点击运行后使用 rAF；离页、后台、黑屏、打印时取消循环并暂停。用 `deck:slidechange`、`deck:stepchange` 监听演示状态，不增加通用插件平台。
+- 交互图表、仿真或 CSS 3D 必须有真正可操作的参数及可读数值，明确模型、单位和示意性质。交互根标记 `data-interactive`，便于导出清单识别；在页面预留的页脚或说明区域写清“配套 HTML 中可交互”，不要在导出时覆盖正文。输入、链接、媒体、拖动、选中文字与画笔不得误触下一步。仿真只在当前页可见且用户点击运行后使用 rAF；离页、后台、黑屏、打印时取消循环并暂停。用 `deck:slidechange`、`deck:stepchange` 监听演示状态，不增加通用插件平台。
 - 保留独立演讲者窗口（当前页、下一页、备注、同步导航、计时暂停/继续/重置），弹窗被阻止时显示可操作的错误。只共享听众放映窗口，不共享演讲者窗口。计时首次放映启动，结束暂停，重新放映继续累计；新一轮排练可重置。
+- 自动双屏为可选增强，不作为普通放映的前置条件。通过“检测屏幕 / 请求权限”及用户选择启动，不默认获得权限或绕过浏览器限制。推荐本机 `npm run present -- --html <文稿.html>` 或 HTTPS；不支持、拒绝权限或全屏失败时，保留手动/单屏入口。真实多屏未经现场检查时如实说明。
 - 保留放映中的 B/W 黑白屏、L 激光笔、P 画笔、E 清除本页墨迹。墨迹按页暂存于内存，关闭页面即丢失，不写入下载的 HTML 或打印的 PDF；不声称持久化保存。
 - 放映模式只显示当前幻灯片及必要控制，不显示讲稿。全屏 API 被阻止时保留窗口内放映。不要把全屏 API 成功作为导航的前提。
 - 工作区以 `references/interface-reference.md` 中用户提供的 PowerPoint 网页版截图为视觉基准，保留完整选项卡次序、紧凑功能区、文件下拉菜单和底部备注条。界面使用 PowerPoint 名称和内嵌官方图标，来源见界面参考；未实现的编辑或云服务控件置灰并说明原因，不能显示虚假的登录、云保存或协作状态。实际演示操作必须可用。内容编辑与持久化保存仍未实现；PPTX 通过配套截图导出脚本生成，不将 HTML 文件改扩展名冒充 PPTX。没有同尺寸截图的差异检查，不宣称像素完全一致。

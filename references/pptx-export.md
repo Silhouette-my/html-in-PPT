@@ -24,7 +24,13 @@ npm run doctor
 npm run export -- --html "presentation.html" --output-dir "delivery"
 ```
 
-`delivery` 必须是尚不存在的新目录，避免覆盖上一份成果。输入应使用本 skill 的模板结构，且为自包含 HTML：图片、字体和媒体嵌入文件，不引用外部脚本、样式或本地旁挂资源。普通参考文献超链接可以保留。导出会执行 HTML 脚本，仅处理已审阅或自行生成的文件。
+`delivery` 必须是尚不存在的新目录，避免覆盖上一份成果。频繁修改时可改用自动编号，不必删除旧目录：
+
+```bash
+npm run export -- --html "presentation.html" --auto-version "delivery"
+```
+
+这会分配 `delivery-001`、`delivery-002` 等新目录。`--auto-version` 与 `--output-dir` 二选一；原有拒绝覆盖行为不变。输入应使用本 skill 的模板结构，且为自包含 HTML：图片、字体和媒体嵌入文件，不引用外部脚本、样式或本地旁挂资源。普通参考文献超链接可以保留。导出会执行 HTML 脚本，仅处理已审阅或自行生成的文件。
 
 命令自动完成环境检查、浏览器渲染、等待字体与图片就绪、按顺序捕获全部幻灯片、生成真实 PPTX、设置首页链接、校验和 ZIP 打包。无需 agent 手工点击十次截图。
 
@@ -42,7 +48,7 @@ delivery/
 
 自动导出会重新加载原始 HTML，使用文稿定义的初始参数，不读取其他浏览器窗口里的临时状态。PPTX 每页为一张等比例完整截图。所有分步内容都显示，物理模拟和 CSS 3D 使用模板定义的静态替代。模型的交互能力仍在 HTML 中。`slides` 可用于视觉检查；清单及验证记录用于确认页数、顺序、尺寸、图片和首页链接。
 
-ZIP 只包含 HTML 和 PPTX，截图、清单和验证记录留在输出目录供检查。交付优先提供 ZIP。解压后保持 HTML 与 PPTX 在同一目录，在桌面 PowerPoint 中放映并点击第一页即可进入 HTML。macOS 首次打开可能要求授予该 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标文件后操作，不关闭全局安全保护。
+ZIP 包含 HTML、PPTX 和 `使用说明.txt`，截图、清单和验证记录留在输出目录供检查。清单的 `interactiveSlides` 会记录带 `data-interactive` 或 `data-effect` 标记的交互页，页码从 1 开始；原有 `slides` 文件名数组保持不变。交付优先提供 ZIP。解压后保持 HTML 与 PPTX 在同一目录，在桌面 PowerPoint 中放映并点击第一页即可进入 HTML。macOS 首次打开可能要求授予该 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标文件后操作，不关闭全局安全保护。
 
 若用户已提供网页地址，可追加 `--url https://example.com/deck.html`。脚本不会上传或发布 HTML。
 
@@ -74,7 +80,7 @@ node scripts/export_pptx.mjs --slides slides --html presentation.html --output p
 
 ### 提示 Chromium could not start
 
-执行 `npm run browser:install`，然后重跑 `npm run doctor`。Linux 若缺少系统库，按 doctor 提示使用 `npx playwright install --with-deps chromium`；系统依赖安装可能需要管理员权限。Windows/macOS 不需要这一步。
+执行 `npm run browser:install`，然后重跑 `npm run doctor`。下载不可用但系统已有 Chrome/Edge 时，可按下节选择系统浏览器。Linux 若缺少系统库，按 doctor 提示使用 `npx playwright install --with-deps chromium`；系统依赖安装可能需要管理员权限。Windows/macOS 不需要这一步。
 
 ### 提示 Refusing to overwrite
 
@@ -95,3 +101,24 @@ node scripts/export_pptx.mjs --slides slides --html presentation.html --output p
 ### 首页点击没有打开 HTML
 
 先确认已解压 ZIP、两份文件在同一目录，并在桌面 PowerPoint 的放映模式点击第一页。编辑模式的点击行为取决于 PowerPoint。按目标系统提示确认文件权限；网页 Office 或学校设备策略可能不允许打开本地 HTML，此时可直接打开 HTML 或使用静态 PPTX。
+
+## 下载受限时使用系统 Chrome / Edge
+
+默认仍使用 Playwright 配套 Chromium。已安装系统浏览器时，可显式设置 `HTML_DECK_BROWSER_CHANNEL`，Chrome 用 `chrome`，Edge 用 `msedge`。环境检查与实际导出使用同一选择，doctor 会报告所选浏览器。不会自动更改浏览器或系统安全设置。
+
+macOS / Bash：
+
+```bash
+HTML_DECK_BROWSER_CHANNEL=chrome npm run doctor
+HTML_DECK_BROWSER_CHANNEL=chrome npm run export -- --html "presentation.html" --auto-version "delivery"
+```
+
+Windows PowerShell：
+
+```powershell
+$env:HTML_DECK_BROWSER_CHANNEL = "msedge"
+npm run doctor
+npm run export -- --html "presentation.html" --auto-version "delivery"
+```
+
+回到默认浏览器时，Bash 执行 `unset HTML_DECK_BROWSER_CHANNEL`，PowerShell 执行 `Remove-Item Env:HTML_DECK_BROWSER_CHANNEL`。选定浏览器未安装或无法启动时，按错误信息安装该浏览器或取消选择；这不会解决 npm 包本身尚未安装的问题。

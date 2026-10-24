@@ -15,7 +15,7 @@
 - **按自己的节奏讲。** 点击或按方向键逐步展开内容，再翻页；支持撤回步骤、概览和指定页跳转。
 - **现场操作模型。** 实时函数图表、可暂停的阻尼弹簧、可拖动的 CSS 3D 示例，可按主题替换。
 - **保留熟悉的放映工具。** 独立演示者窗口、讲稿、计时、画笔、激光笔、黑白屏。
-- **同时交付两种文件。** HTML 保留交互，PPTX 保留每页完整画面；ZIP 中放两份文件，方便一起带走。
+- **同时交付两种文件。** HTML 保留交互，PPTX 保留每页完整画面；ZIP 中附带两份文件和使用说明，方便一起带走。
 
 界面参考 PowerPoint 网页版。内容由 agent 改写 HTML，没有拖拽编辑、云端保存或协作；未实现的编辑按钮置灰。页面显示 `.pptx` 文稿名，实际 HTML 下载仍使用 `.html` 扩展名。
 
@@ -45,12 +45,14 @@ npm run browser:install
 npm run doctor
 ```
 
-`npm run browser:install` 下载失败时，可以直接复用系统已安装的 Chrome 或 Edge：
+`npm run browser:install` 下载失败时，可以显式复用系统已安装的 Chrome（`chrome`）或 Edge（`msedge`）。macOS / Bash 示例：
 
 ```bash
 HTML_DECK_BROWSER_CHANNEL=chrome npm run doctor
 HTML_DECK_BROWSER_CHANNEL=chrome npm run export -- --html "presentation.html" --output-dir "delivery"
 ```
+
+Windows PowerShell 的设置方式及排错见 [系统浏览器用法](references/pptx-export.md#下载受限时使用系统-chrome--edge)。
 
 agent 完成 `presentation.html` 后执行：
 
@@ -58,7 +60,7 @@ agent 完成 `presentation.html` 后执行：
 npm run export -- --html "presentation.html" --output-dir "delivery"
 ```
 
-也可以直接用 `assets/deck-template.html` 作为输入，试跑完整流程。`delivery` 必须是尚不存在的新目录。Windows 和 macOS 命令相同，路径含空格时加引号。
+也可以直接用 `assets/deck-template.html` 作为输入，试跑完整流程。`delivery` 必须是尚不存在的新目录。反复修改可用 `--auto-version "delivery"` 替代 `--output-dir`，自动分配 `delivery-001` 等新目录。Windows 和 macOS 命令相同，路径含空格时加引号。
 
 ```text
 delivery/
@@ -95,10 +97,12 @@ skill 是模型读取的工作说明和资源包，不是后台服务。生成�
 ## 演示前检查
 
 1. 解压 ZIP，保持 HTML 与 PPTX 在同一文件夹；只上传 PPTX 时，静态页面仍可读，但接收者没有配套 HTML 就无法打开交互版。
-2. 在目标电脑上打开 PPTX，放映第一页并点击画面。macOS 可能要求授予 HTML 文件访问权限，Windows 可能显示 Office 外部链接提示；确认目标后操作，不需要关闭全局安全保护。
+2. 按 ZIP 内的 `使用说明.txt` 操作。在目标电脑上打开 PPTX，放映第一页并点击画面。macOS 可能要求授予 HTML 文件访问权限，Windows 可能显示 Office 外部链接提示；确认目标后操作，不需要关闭全局安全保护。
 3. 检查浏览器字体、全屏、弹窗和投屏对象。演示者窗口留给自己，只把听众窗口投出去。
 
 HTML 支持离线播放，交互不在 PPTX 内运行。PowerPoint 网页版和其他演示软件是否允许打开本地 HTML，需由目标软件决定。完整操作见 [放映指南](references/presenting.md)。
+
+需要自动选择投影屏幕时，运行 `npm run present -- --html "presentation.html"`，在 Chrome/Edge 打开的页面中选择“幻灯片放映 → 双屏设置”。先授权检测屏幕，再选择观众屏开始。系统需使用扩展显示；权限或浏览器不支持时，仍可手动拖动窗口。详情见 [自动双屏](references/presenting.md#自动双屏先选观众屏再开始放映)。
 
 ## 文档与开发
 
@@ -113,6 +117,6 @@ HTML 支持离线播放，交互不在 PPTX 内运行。PowerPoint 网页版和�
 
 准备好 npm 依赖和 Chromium 后运行 `npm test`。测试覆盖步骤状态、双端路径与快捷键、真实 10 页截图导出、图片顺序和尺寸、首页链接、ZIP 内容及拒绝覆盖等行为。[GitHub Actions](https://github.com/Silhouette-my/html-in-PPT/actions/workflows/platform-tests.yml) 在 Windows/macOS 执行同一套检查。
 
-macOS 已实际打开生成的 PPTX；Windows 桌面 Office、其他浏览器和实体双屏投影仍需现场确认。自动测试不判断内容和审美。
+macOS 已实际打开生成的 PPTX；新增双屏设置有权限、弹窗、全屏重试与断屏的模拟测试，真实双屏投影尚未验证。Windows 桌面 Office和其他浏览器仍需现场确认。自动测试不判断内容和审美。
 
 遇到问题可以 [提 issue](https://github.com/Silhouette-my/html-in-PPT/issues)，附上系统、Node 版本、执行命令和报错；提供最小示例时先移除私人资料。

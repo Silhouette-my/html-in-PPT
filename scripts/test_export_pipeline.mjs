@@ -17,9 +17,15 @@ try {
   const source = path.join(temp, '测试 # 100%.html');
   await fs.copyFile(path.join(root, 'assets/deck-template.html'), source);
   const output = path.join(temp, '成果');
-  run('export_deck.mjs', ['--html', source, '--output-dir', output]);
+  const prefix = path.join(temp, 'delivery');
+  await fs.mkdir(`${prefix}-001`);
+  const versionResult = run('export_deck.mjs', ['--html', source, '--auto-version', prefix]);
+  assert.equal(JSON.parse(versionResult).outputDirectory, `${prefix}-002`);
+  await fs.rename(`${prefix}-002`, output);
   const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json')));
   assert.equal(manifest.slides.length, 10);
+  assert.deepEqual(manifest.interactiveSlides.map(slide => slide.slide), [6, 7, 8]);
+  assert(manifest.interactiveSlides.every(slide => slide.effects.length && slide.interactiveRegions > 0));
   assert.deepEqual(manifest.slides, Array.from({ length: 10 }, (_, index) => `slide-${String(index + 1).padStart(2, '0')}.png`));
   const pptx = await JSZip.loadAsync(await fs.readFile(path.join(output, manifest.pptx)));
   assert.equal(Object.keys(pptx.files).filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name)).length, 10);
@@ -36,7 +42,9 @@ try {
     if (index > 1) assert(!rels.includes('/hyperlink'));
   }
   const bundle = await JSZip.loadAsync(await fs.readFile(path.join(output, '测试 # 100%-bundle.zip')));
-  assert.deepEqual(Object.keys(bundle.files).sort(), [manifest.html, manifest.pptx].sort());
+  assert.deepEqual(Object.keys(bundle.files).sort(), [manifest.html, manifest.pptx, '使用说明.txt'].sort());
+  const instructions = await bundle.file('使用说明.txt').async('string');
+  for (const text of [manifest.html, manifest.pptx, '静态截图', '权限', '同目录']) assert(instructions.includes(text));
   assert((await bundle.file(manifest.html).async('nodebuffer')).equals(await fs.readFile(source)));
   assert(run('export_deck.mjs', ['--html', source, '--output-dir', output], 1).includes('Refusing to overwrite'));
   const external = path.join(temp, 'external.html');
