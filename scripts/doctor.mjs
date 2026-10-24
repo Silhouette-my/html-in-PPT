@@ -4,14 +4,16 @@ import path from 'node:path';
 
 export async function doctor() {
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required.');
+  // Optional: reuse an installed Chrome/Edge when Playwright's Chromium is unavailable.
+  const browserChannel = process.env.HTML_DECK_BROWSER_CHANNEL;
   let chromium;
   try {
     ({ chromium } = await import('playwright'));
     await import('pptxgenjs'); await import('jszip');
   } catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Export dependencies are missing. Run npm ci in the skill directory.'); throw error; }
   let browser;
-  try { browser = await chromium.launch({ headless: true }); }
-  catch (error) { throw new Error(`Chromium could not start. Run npm run browser:install. On Linux, use npx playwright install --with-deps chromium. ${error.message}`); }
+  try { browser = await chromium.launch({ headless: true, ...(browserChannel ? { channel: browserChannel } : {}) }); }
+  catch (error) { throw new Error(`Chromium could not start. Run npm run browser:install, or reuse an installed browser with HTML_DECK_BROWSER_CHANNEL=chrome. On Linux, use npx playwright install --with-deps chromium. ${error.message}`); }
   await browser.close();
   return { node: process.versions.node, platform: process.platform, dependencies: 'ready', chromium: 'ready' };
 }

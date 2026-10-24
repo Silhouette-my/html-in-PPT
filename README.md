@@ -45,6 +45,13 @@ npm run browser:install
 npm run doctor
 ```
 
+`npm run browser:install` 下载失败时，可以直接复用系统已安装的 Chrome 或 Edge：
+
+```bash
+HTML_DECK_BROWSER_CHANNEL=chrome npm run doctor
+HTML_DECK_BROWSER_CHANNEL=chrome npm run export -- --html "presentation.html" --output-dir "delivery"
+```
+
 agent 完成 `presentation.html` 后执行：
 
 ```bash
