@@ -11,7 +11,7 @@
 <p data-step="3">最后总结观察与边界。</p>
 ```
 
-工作区显示全部内容。放映从第 0 步开始，点击背景、下一步按钮或方向键每次揭示一组，全部揭示后进入下一页；上一步先撤回一组，跨页时回到上一页完整状态。缩略图、概览、页码及 URL 跳转重置目标页步骤。停止再开始同样重置当前页；打开已有放映的演示者窗口不重置。控制条与演示者当前页显示步骤进度，演示者下一页显示完整内容。
+工作区显示全部内容。放映从第 0 步开始，点击背景、下一步按钮或方向键每次揭示一组，全部揭示后进入下一页；上一步先撤回一组，跨页时回到上一页完整状态。缩略图、概览、页码及 URL 跳转重置目标页步骤。停止再开始同样重置当前页。演讲者主窗口控制当前页，观众弹窗呈现同一页和步骤；下一页预览为静态且不会推进演示。
 
 “动画”的逐步显示开关关闭时直接翻页；开关和重置将当前页步骤置零。“切换”的淡入仅影响页面切换，尊重 `prefers-reduced-motion`。
 
@@ -28,16 +28,36 @@
 - `deck:slidechange`：直接跳页或跨页后触发。
 - `deck:stepchange`：步骤、逐步开关、开始或停止放映时触发。
 
-两者的 `event.detail` 都是 `{ index, step, total, presenting, progressive }`。`index` 从 0 开始；`step` 是已揭示组数；`total` 是当前页的总组数。监听这些事件即可启动/停止与页或步骤有关的效果。另监听浏览器的 `visibilitychange` 与 `beforeprint`，在后台或打印时取消 rAF。用户必须明确点击运行；返回后手动继续。不要把仿真放进全局持续定时器。
+两者的 `event.detail` 都是 `{ index, step, total, presenting, progressive }`。`index` 从 0 开始；`step` 是已揭示组数；`total` 是当前页的总组数。监听这些事件即可启动/停止与页或步骤有关的效果。若放映采用双窗口，只有所有放映画面都不可见时才暂停基于 rAF 的持续效果；演讲者控制台切到后台而观众窗口仍可见时，观众画面不能冻结。打印时取消 rAF。用户必须明确点击运行；返回后手动继续。不要把仿真放进全局持续定时器。
 
-`deck:blankchange` 在黑白屏状态改变时触发，detail 为 `{ index, blank, presenting }`；`blank` 是 `"black"`、`"white"` 或空字符串。自定义持续效果用它处理黑白屏暂停；浏览器后台与打印分别使用 `visibilitychange`、`beforeprint`。
+`deck:blankchange` 在黑白屏状态改变时触发，detail 为 `{ index, blank, presenting }`；`blank` 是 `"black"`、`"white"` 或空字符串。自定义持续效果用它处理黑白屏暂停。`visibilitychange` 仅在没有仍可见的观众放映画面时用于暂停；打印使用 `beforeprint` 并取消 rAF。
 
 模板第 7 页使用 `m=1 kg`、`m x″+c x′+k x=0`、初始位移 `1 m` 与速度 `0 m/s`。半隐式 Euler 每次积分不超过 `1/120 s`，一帧累计时间封顶 `0.05 s`。这适用于教学展示，不替代高精度求解器。阻尼与劲度滑块直接作用于模型。
 
 ## 预览与打印保留含义
 
-持续效果放入 `.effect-live`，用 `.static-effect` 提供内联 SVG 结构图，并说明这是静态替代。模板的 `.snapshot` 克隆会在缩略图、概览与演示者预览中切换为结构图；打印也使用它。步骤在打印时全部可见。Canvas 数值还要以普通文字显示，不能只画在像素里。
+持续效果放入 `.effect-live`，用 `.static-effect` 提供内联 SVG 结构图，并说明这是静态替代。缩略图、概览、下一页预览、打印和 PPTX 截图应使用确定的静态表达，不启动或推进交互引擎。步骤在打印和默认 PPTX 导出时全部可见；按步骤导出则为每一步设置确定的静态状态。Canvas 数值还要以普通文字显示，不能只画在像素里。
 
 CSS 3D 模型提供拖动、角度滑块、键盘与重置；不自动旋转。打印可以固定为清楚的轴测图，而不是复制某个恰好不可读的旋转角度。
+
+讲稿只定义在源页 `<aside class="speaker-note">` 中。可用 `<p>` 分段、`<ul>/<ol>` 列出要点，并用明确文字标记点击、拖动或展示结果等操作提示；讲稿同时显示于演讲者控制台并写入对应 PPTX 原生备注。不要在 PPTX 正文截图里渲染讲稿，也不要维护第二份讲稿。
+
+### 自定义交互状态同步与导出
+
+仅注册需要同步或静态导出的交互；普通点击、动画和任意私有 JavaScript 状态不会自动同步。使用模板公开的 `htmlDeck.registerEffect` 注册确定的状态读写和静态导出处理：
+
+```js
+htmlDeck.registerEffect({
+  id: 'my-model',                 // 稳定且唯一
+  index: 5,                       // 所属源页，0 起算
+  getState: () => ({ value }),    // 可结构化克隆的状态
+  restoreState: state => setValue(state.value),
+  prepareExport: ({ index, step, active }) => {
+    if (active) setValue(0);      // 明确、可重复的导出状态
+  }
+});
+```
+
+状态改变后调用 `htmlDeck.notifyEffectChange('my-model')`，使观众窗口刷新状态；重建交互画面时传 `{ rebuild: true }`。优先让 Canvas 使用稳定 DOM id 并由同一个状态函数绘制。接口用于明确纳入的状态适配器，不会同步 iframe、视频或任意页面脚本。导出器按当前源页/步骤调用 `htmlDeck.prepareExport({ index, step })`；`step` 可以是 `'all'` 或 `0..stepCount`，适配器的 `prepareExport` 要让该状态呈现确定的静态画面。
 
 示例效果仅在对应 `data-effect="chart|physics|cube"` 页存在时初始化；删除示例页不会破坏导航。保留示例页时须保留其配套控件 ID。新的效果直接写在内联脚本中，使用本地生命周期监听即可，无需添加依赖或插件框架。下载保留代码和资源，临时参数与模拟状态不写回原文件。

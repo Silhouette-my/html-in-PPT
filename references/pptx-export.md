@@ -32,7 +32,35 @@ npm run export -- --html "presentation.html" --auto-version "delivery"
 
 这会分配 `delivery-001`、`delivery-002` 等新目录。`--auto-version` 与 `--output-dir` 二选一；原有拒绝覆盖行为不变。输入应使用本 skill 的模板结构，且为自包含 HTML：图片、字体和媒体嵌入文件，不引用外部脚本、样式或本地旁挂资源。普通参考文献超链接可以保留。导出会执行 HTML 脚本，仅处理已审阅或自行生成的文件。
 
-命令自动完成环境检查、浏览器渲染、等待字体与图片就绪、按顺序捕获全部幻灯片、生成真实 PPTX、设置首页链接、校验和 ZIP 打包。无需 agent 手工点击十次截图。
+命令自动完成环境检查、浏览器渲染、等待字体与图片就绪、按顺序捕获幻灯片、写入原生备注、生成 PPTX、设置首页链接、校验和 ZIP 打包。默认每个 HTML 页对应一个完整画面；备注不进入截图。
+
+### 页码范围和步骤展开
+
+默认输出全部页，每页所有 `data-step` 内容均可见。可以指定页码并按步骤导出：
+
+```bash
+npm run export -- --html "presentation.html" --output-dir "delivery" --pages 1,3-5
+npm run export -- --html "presentation.html" --output-dir "delivery-steps" --pages 2 --steps
+```
+
+`--pages` 接受逗号分隔页码和范围；重复页码去重，最终顺序按源文稿页序。`--steps` 对选中的每一页依次导出初始状态 `0` 和揭示状态 `1..N`；关闭 `--steps` 时仍是一页 HTML 对一张包含全部步骤的截图。`--ready-timeout <ms>` 控制每页准备就绪的最长等待，默认 `30000` 毫秒；超时应修复指出的页面或资源，而不是降低等待要求。
+
+导出器按顺序等待页面自己的 `window.htmlDeck.ready` Promise、每页的 `htmlDeck.prepareExport({index,step})` Promise、`document.fonts.ready`、所有图片完成 `decode()`，再等两个 animation frame 后截图。页面准备逻辑若有异步资源，必须让 `htmlDeck.ready` 在它们完成时才 resolve；自定义效果的确定性状态放在 `prepareExport` 中。超时会指出当前页和等待时长。静态导出应固定在明确、可重复的状态，不截取随机动画中间帧。
+
+### 性能测量
+
+同一冻结版本（`4125628`）的 10 页示例，各运行旧版和新版导出流程 3 次：
+
+| 测量项 | 旧流程 | 新流程 |
+| --- | ---: | ---: |
+| 总耗时，3 次（ms） | 2195 / 1421 / 1366 | 1612 / 1228 / 1235 |
+| 总耗时中位数（ms） | 1421 | 1235（降低约 13.1%） |
+| 启动与依赖检查中位数（ms） | doctor+capture 合计 582 | 浏览器启动 304；依赖检查 126 |
+| 页面准备中位数（ms） | 257 | 213 |
+| 截图中位数（ms） | 440 | 425 |
+| PPTX 打包中位数（ms） | 111 | 137 |
+
+新版把浏览器复用并将依赖检查与浏览器启动分开计时；PPTX 打包因新增原生备注而略慢。相同输入下，新版 PNG 与旧版逐页字节一致。此数据只描述该固定示例和运行环境，不代表任意文稿都能提速。
 
 输出：
 
@@ -46,15 +74,15 @@ delivery/
   validation.json
 ```
 
-自动导出会重新加载原始 HTML，使用文稿定义的初始参数，不读取其他浏览器窗口里的临时状态。PPTX 每页为一张等比例完整截图。所有分步内容都显示，物理模拟和 CSS 3D 使用模板定义的静态替代。模型的交互能力仍在 HTML 中。`slides` 可用于视觉检查；清单及验证记录用于确认页数、顺序、尺寸、图片和首页链接。
+自动导出会重新加载原始 HTML，使用文稿定义的初始参数，不读取其他浏览器窗口里的临时状态。PPTX 正文每页为一张等比例完整截图；物理模拟和 CSS 3D 使用模板定义的静态替代。讲稿从每个源页唯一的 `speaker-note` 写入对应页的 PowerPoint 原生备注，包含段落、空行、列表标记与操作提示，不进入图像。模型的交互能力仍在 HTML 中。按步骤导出时，一个源页可能对应多张 PPTX 页；不要用 PPTX 页码代替源页码解释备注。
 
-ZIP 包含 HTML、PPTX 和 `使用说明.txt`，截图、清单和验证记录留在输出目录供检查。清单的 `interactiveSlides` 会记录带 `data-interactive` 或 `data-effect` 标记的交互页，页码从 1 开始；原有 `slides` 文件名数组保持不变。交付优先提供 ZIP。解压后保持 HTML 与 PPTX 在同一目录，在桌面 PowerPoint 中放映并点击第一页即可进入 HTML。macOS 首次打开可能要求授予该 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标文件后操作，不关闭全局安全保护。
+ZIP 包含 HTML、PPTX 和 `使用说明.txt`，截图、清单和验证记录留在输出目录供检查。manifest 保持 `slides` 文件名字符串数组，另有逐导出页的 `notes` 与 `mapping`：`sourcePage` 为源 HTML 页码，`step` 为 `'all'` 或步骤数字，`totalSteps` 为该源页步骤数。`interactiveSlides` 记录带 `data-interactive` 或 `data-effect` 标记的交互源页。交付优先提供 ZIP。解压后保持 HTML 与 PPTX 在同一目录，在桌面 PowerPoint 放映并点击第一页即可进入 HTML。macOS 首次打开可能要求授予该 HTML 文件访问权限；Windows 可能显示 Office 外部链接安全提示。确认目标文件后操作，不关闭全局安全保护。
 
 若用户已提供网页地址，可追加 `--url https://example.com/deck.html`。脚本不会上传或发布 HTML。
 
 ## 已有逐页 PNG 的入口
 
-原有命令仍可使用，不启动截图浏览器：
+原有命令仍可使用，不启动截图浏览器，也不要求为已有 PNG 提供备注：
 
 ```bash
 node scripts/export_pptx.mjs --slides slides --html presentation.html --output presentation.pptx

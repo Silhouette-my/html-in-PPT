@@ -3,13 +3,17 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { launchBrowser, browserSelection } from './browser.mjs';
 
-export async function doctor() {
+export async function loadDependencies() {
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required.');
   let chromium;
   try {
     ({ chromium } = await import('playwright'));
     await import('pptxgenjs'); await import('jszip');
   } catch (error) { if (error.code === 'ERR_MODULE_NOT_FOUND') throw new Error('Export dependencies are missing. Run npm ci in the skill directory.'); throw error; }
+  return { chromium };
+}
+export async function doctor() {
+  const { chromium } = await loadDependencies();
   const browser = await launchBrowser(chromium);
   const selection = { ...browserSelection(), version: browser.version() };
   await browser.close();

@@ -35,5 +35,6 @@ assert.equal(sections.filter(section=>section.includes('class="static-effect"'))
 // The print rule must outrank body.presenting .step-hidden, including !important.
 // A bare [data-step] print selector loses and omits unrevealed fragments in PDF.
 assert.match(html, /@media print\{body\.presenting #deck \[data-step\],#deck \[data-step\],[^{]+\{opacity:1!important;visibility:visible!important;transform:none!important\}/);
-assert.match(html, /cancelAnimationFrame\(simulation.raf\)/);
+assert.match(html, /cancelEffectFrame\(simulation.raf\)/);
+assert.match(html, /frame\.host\.cancelAnimationFrame\(frame.id\)/);
 console.log('PASS: 13 step transitions plus full forward/back traversal; 10-slide/fragment/note/static-fallback contracts.');

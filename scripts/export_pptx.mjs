@@ -15,11 +15,15 @@ export async function exportPptx(options) {
   if (path.extname(output).toLowerCase() !== '.pptx') throw new Error('Output must end in .pptx.');
   try { await fs.access(output); throw new Error(`Refusing to overwrite: ${output}`); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (!(await fs.stat(htmlPath)).isFile()) throw new Error(`HTML is not a file: ${htmlPath}`);
-  let names;
+  let names, notes;
   if (options['--manifest']) {
     const manifest = JSON.parse(await fs.readFile(path.resolve(options['--manifest']), 'utf8'));
     if (!Array.isArray(manifest.slides) || !manifest.slides.length || manifest.slides.some(name => typeof name !== 'string' || path.extname(name).toLowerCase() !== '.png')) throw new Error('Manifest needs a nonempty slides array of PNG filenames.');
     names = manifest.slides;
+    if (manifest.notes !== undefined) {
+      if (!Array.isArray(manifest.notes) || manifest.notes.length !== names.length || manifest.notes.some(note => typeof note !== 'string')) throw new Error('Manifest notes must be a string array matching slides in order.');
+      notes = manifest.notes;
+    }
   } else {
     names = (await fs.readdir(directory)).filter(name => /^slide-\d+\.png$/.test(name)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     if (!names.length || names.some((name, index) => Number(name.match(/\d+/)[0]) !== index + 1)) throw new Error('Use contiguous slide-01.png, slide-02.png, … or provide --manifest.');
@@ -39,11 +43,27 @@ export async function exportPptx(options) {
   pptx.defineLayout({ name: 'SCREENSHOT', width: width / 100, height: height / 100 });
   pptx.layout = 'SCREENSHOT'; pptx.author = 'html-deck'; pptx.subject = 'HTML screenshot presentation';
   for (const [index, image] of images.entries()) {
-    pptx.addSlide().addImage({ data: `data:image/png;base64,${image.bytes.toString('base64')}`, x: 0, y: 0, w: width / 100, h: height / 100, altText: image.name,
+    const slide = pptx.addSlide();
+    slide.addImage({ data: `data:image/png;base64,${image.bytes.toString('base64')}`, x: 0, y: 0, w: width / 100, h: height / 100, altText: image.name,
       ...(index === 0 ? { hyperlink: { url: target, tooltip: '打开交互式 HTML 演示' } } : {}) });
+    if (notes) slide.addNotes(notes[index]);
   }
-  const bytes = await pptx.write({ outputType: 'nodebuffer', compression: true });
+  let bytes = await pptx.write({ outputType: 'nodebuffer', compression: true });
   const zip = await JSZip.loadAsync(bytes);
+  const escapeXml = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  if (notes) {
+    // addNotes establishes native notes parts/relationships. PptxGenJS puts all
+    // lines in one a:t; preserve authored paragraph boundaries as native a:p.
+    for (let index = 0; index < notes.length; index++) {
+      const name = `ppt/notesSlides/notesSlide${index + 1}.xml`;
+      const xml = await zip.file(name).async('string');
+      const paragraphs = notes[index].replace(/\r\n?/g, '\n').split('\n').map(line => `<a:p><a:r><a:rPr lang="zh-CN"/><a:t xml:space="preserve">${escapeXml(line)}</a:t></a:r></a:p>`).join('');
+      const body = /(<p:sp>\s*<p:nvSpPr>[\s\S]*?<p:ph type="body"[^>]*\/>[\s\S]*?<p:txBody>)[\s\S]*?(<\/p:txBody>)/;
+      if (!body.test(xml)) throw new Error(`Slide ${index + 1} native notes body was not created.`);
+      zip.file(name, xml.replace(body, (_, start, end) => `${start}<a:bodyPr/><a:lstStyle/>${paragraphs}${end}`));
+    }
+    bytes = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  }
   const slideFiles = Object.keys(zip.files).filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name));
   if (slideFiles.length !== images.length) throw new Error('PPTX slide count does not match screenshots.');
   for (let index = 1; index <= images.length; index++) {
@@ -54,7 +74,6 @@ export async function exportPptx(options) {
     if (!media || !(await zip.file(path.posix.normalize(`ppt/slides/${media[1]}`)).async('nodebuffer')).equals(images[index - 1].bytes)) throw new Error(`Slide ${index} screenshot media does not match its input.`);
   }
   const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels').async('string');
-  const escapeXml = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   if (!rels.includes(`Target="${escapeXml(target)}"`) || !rels.includes('/hyperlink')) throw new Error('PPTX lost the HTML hyperlink.');
   const cover = await zip.file('ppt/slides/slide1.xml').async('string');
   const linkId = cover.match(/<a:hlinkClick\b[^>]*r:id="([^"]+)"/)?.[1];
