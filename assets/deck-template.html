@@ -439,14 +439,18 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     let busy=false;
     return async function launchLocalPresenter() {
       if(busy)return false;
-      // Open while the user's click still has popup activation. Screen access
-      // remains a browser prompt; the CMD profile allows the later fullscreen.
-      if(!env.openPresenter())return false;
       busy=true;
       try {
+        // Keep the permission prompt in the presenter window. Only create the
+        // audience after consent, on its target screen; the CMD profile allows
+        // popup/fullscreen requests after the asynchronous permission response.
+        env.enterPresenter();
         let state=await env.session.discover();
         if(!env.isActive())return false;
-        if(state.phase==='ready')state=await env.session.launch();
+        if(state.phase==='ready'){
+          if(!env.openAudience(state.screens[state.selected])){env.showSetup();return false;}
+          state=await env.session.launch();
+        }
         if(env.isActive()&&state.phase!=='presenting')env.showSetup();
         return state.phase==='presenting';
       } finally {busy=false;}
@@ -911,7 +915,7 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     }
   });
   function showDualSetup(){closeMenus();hideSearch();$('dual-screen-status').textContent=dualScreenSession.getState().message;$('dual-screen-dialog').showModal();}
-  const launchLocalPresenter=createLocalPresenterLauncher({session:dualScreenSession,openPresenter:()=>openPresenter({focus:false}),isActive:()=>controllerMode,showSetup:showDualSetup});
+  const launchLocalPresenter=createLocalPresenterLauncher({session:dualScreenSession,enterPresenter:enterController,openAudience:screen=>openPresenter({screen,focus:false}),isActive:()=>controllerMode,showSetup:showDualSetup});
   function openPresenterFromGesture(){
     closeMenus();hideSearch();
     if(isLocalPresenterLocation(window.location))return launchLocalPresenter();

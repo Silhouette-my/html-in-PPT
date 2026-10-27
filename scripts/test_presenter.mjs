@@ -106,7 +106,7 @@ try {
       window.moveTo=(left,top)=>{window.windowBoundsCalls.push(['move',left,top]);return moveTo(left,top);};
       const open=window.open.bind(window);window.popupFeatures=[];
       window.open=(url,name,features)=>{window.popupFeatures.push(features);return open(url,name,features);};
-      window.getScreenDetails=async()=>{window.screenRequests++;return {screens:[origin,audience],currentScreen:origin,addEventListener(){},removeEventListener(){}};};
+      window.getScreenDetails=()=>{window.screenRequests++;return new Promise(resolve=>{window.allowScreenAccess=()=>resolve({screens:[origin,audience],currentScreen:origin,addEventListener(){},removeEventListener(){}});});};
       Element.prototype.requestFullscreen=function(options){window.fullscreenTargets.push(options?.screen?.label||'default');Object.defineProperty(this.ownerDocument,'fullscreenElement',{configurable:true,get:()=>this});return Promise.resolve();};
     });
     const modelPresenterFrame=page=>page.evaluate(()=>{
@@ -121,11 +121,17 @@ try {
     await localPage.evaluate(()=>htmlDeck.ready);
     await modelPresenterFrame(localPage);
     assert.equal(await localPage.evaluate(()=>window.screenRequests),0,'opening the default HTML must not prompt for screen permission');
-    const localPopup=context.waitForEvent('page');await localPage.locator('#present').click();const localAudience=await localPopup;
+    await localPage.locator('#tab-show').click();await localPage.locator('#presenter').click();
+    await localPage.waitForFunction(()=>window.screenRequests===1);
+    assert.equal(await localPage.locator('#controller').isVisible(),true,'screen permission belongs to the visible presenter');
+    assert.deepEqual(await localPage.evaluate(()=>window.popupFeatures),[],'no audience may cover the pending permission prompt');
+    assert.equal(context.pages().length,1,'wait for Allow before creating an audience window');
+    const localPopup=context.waitForEvent('page');await localPage.evaluate(()=>window.allowScreenAccess());const localAudience=await localPopup;
     await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='presenting');
     assert.equal(await localPage.evaluate(()=>window.screenRequests),1);
     assert.deepEqual(await localAudience.evaluate(()=>window.fullscreenTargets),['Audience']);
     const features=await localPage.evaluate(()=>window.popupFeatures[0]);
+    assert.ok(Number(features.match(/left=(-?\d+)/)[1])>=1920,'open directly on the granted secondary screen');
     const popupWidth=Number(features.match(/width=(\d+)/)[1]),popupHeight=Number(features.match(/height=(\d+)/)[1]);
     assert.equal(popupWidth+16,1120,'popup viewport plus frame matches the presenter outer width');
     assert.equal(popupHeight+38,630,'the complete window, including chrome, uses 16:9');
@@ -141,15 +147,24 @@ try {
     await localPage.reload();
     await modelPresenterFrame(localPage);
     await localPage.evaluate(()=>{window.getScreenDetails=async()=>{throw new DOMException('denied','NotAllowedError');};});
-    const deniedPopup=context.waitForEvent('page');await localPage.locator('#present').click();const deniedAudience=await deniedPopup;
+    await localPage.locator('#present').click();
     await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='manual');
     assert.equal(await localPage.locator('#dual-screen-dialog').isVisible(),true,'permission denial retains the manual path');
     assert.equal(await localPage.locator('#controller').isVisible(),true,'permission denial retains the presenter');
+    assert.deepEqual(await localPage.evaluate(()=>window.popupFeatures),[],'denial must not open an audience over the presenter');
+    assert.equal(context.pages().length,1);
+    const deniedPopup=context.waitForEvent('page');await localPage.locator('#dual-manual').click();const deniedAudience=await deniedPopup;
     await localPage.evaluate(()=>{window.presenterWidth=960;window.dispatchEvent(new Event('resize'));});
     await deniedAudience.waitForFunction(()=>window.windowBoundsCalls.some(call=>call[0]==='resize'&&call[1]===960&&call[2]===540));
     await deniedAudience.evaluate(()=>Object.defineProperty(window,'screen',{configurable:true,value:{availLeft:0,availTop:0,availWidth:800,availHeight:600}}));
     await localPage.evaluate(()=>{window.presenterWidth=1120;window.dispatchEvent(new Event('resize'));});
     await deniedAudience.waitForFunction(()=>window.windowBoundsCalls.some(call=>call[0]==='resize'&&call[1]===800&&call[2]===450));
+    await localPage.locator('#controller-end').click();await localPage.reload();
+    await localPage.locator('#present').click();await localPage.waitForFunction(()=>window.screenRequests===1);
+    await localPage.locator('#controller-end').click();
+    await localPage.evaluate(async()=>{window.allowScreenAccess();await new Promise(resolve=>setTimeout(resolve,0));});
+    assert.deepEqual(await localPage.evaluate(()=>window.popupFeatures),[],'late permission after ending must not create an audience');
+    assert.equal(context.pages().length,1);
   } finally {await context.close();await local.close();}
   await page.evaluate(async()=>{window.exportHook=false;htmlDeck.registerEffect({id:'test',index:0,getState:()=>({}),restoreState:()=>{},prepareExport:async()=>{await new Promise(resolve=>setTimeout(resolve,25));window.exportHook=true;}});await htmlDeck.prepareExport({index:0});});
   assert.equal(await page.evaluate(()=>window.exportHook),true);assert.deepEqual(errors,[]);

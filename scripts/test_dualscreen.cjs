@@ -63,19 +63,21 @@ function fixture(overrides={}){
  // only after a presenter gesture; no permissions or windows are opened at load.
  for(const [address,expected] of [['http://127.0.0.1:8768/deck.html?local-present=1',true],['http://localhost:8768/?local-present=1',true],['https://example.com/?local-present=1',false],['file:///deck.html?local-present=1',false],['http://127.0.0.1:8768/deck.html',false]])assert.equal(context.isLocalPresenterLocation(new URL(address)),expected);
  for(const ready of ['presenting','manual','retry']){
-  const calls=[];const launch=context.createLocalPresenterLauncher({openPresenter:()=>{calls.push('popup');return true;},isActive:()=>true,showSetup:()=>calls.push('setup'),session:{discover:async()=>{calls.push('permission');return {phase:ready==='manual'?'manual':'ready'};},launch:async()=>{calls.push('fullscreen');return {phase:ready};}}});
-  assert.deepEqual(calls,[]);const pending=launch();assert.deepEqual(calls,['popup','permission']);await pending;
-  assert.deepEqual(calls,ready==='manual'?['popup','permission','setup']:ready==='retry'?['popup','permission','fullscreen','setup']:['popup','permission','fullscreen']);
+  const calls=[],target=screen(1920,'投影屏');
+  const launch=context.createLocalPresenterLauncher({enterPresenter:()=>calls.push('presenter'),openAudience:selected=>{assert.equal(selected,target);calls.push('popup');return true;},isActive:()=>true,showSetup:()=>calls.push('setup'),session:{discover:async()=>{calls.push('permission');return {phase:ready==='manual'?'manual':'ready',screens:[screen(0,'讲稿屏'),target],selected:1};},launch:async()=>{calls.push('fullscreen');return {phase:ready};}}});
+  assert.deepEqual(calls,[]);const pending=launch();assert.deepEqual(calls,['presenter','permission'],'request permission in the presenter without opening an audience');await pending;
+  assert.deepEqual(calls,ready==='manual'?['presenter','permission','setup']:ready==='retry'?['presenter','permission','popup','fullscreen','setup']:['presenter','permission','popup','fullscreen']);
  }
  let permissionDone,active=true;const localCalls=[];
- const local=context.createLocalPresenterLauncher({openPresenter:()=>{localCalls.push('popup');return true;},isActive:()=>active,showSetup:()=>localCalls.push('setup'),session:{discover:()=>new Promise(resolve=>permissionDone=resolve),launch:()=>{localCalls.push('fullscreen');return {phase:'presenting'};}}});
- const localPending=local();assert.equal(await local(),false,'ignore repeated clicks while permission is pending');active=false;permissionDone({phase:'ready'});await localPending;assert.deepEqual(localCalls,['popup'],'ending the presenter while permission is pending must not fullscreen a closed audience');
- let blockedPermission=false;const blockedLocal=context.createLocalPresenterLauncher({openPresenter:()=>false,session:{discover:()=>{blockedPermission=true;}}});await blockedLocal();assert.equal(blockedPermission,false);
+ const local=context.createLocalPresenterLauncher({enterPresenter:()=>localCalls.push('presenter'),openAudience:()=>{localCalls.push('popup');return true;},isActive:()=>active,showSetup:()=>localCalls.push('setup'),session:{discover:()=>{localCalls.push('permission');return new Promise(resolve=>permissionDone=resolve);},launch:()=>{localCalls.push('fullscreen');return {phase:'presenting'};}}});
+ const localPending=local();assert.equal(await local(),false,'ignore repeated clicks while permission is pending');active=false;permissionDone({phase:'ready'});await localPending;assert.deepEqual(localCalls,['presenter','permission'],'ending the presenter while permission is pending must not open or fullscreen an audience');
+ const blockedCalls=[];const blockedLocal=context.createLocalPresenterLauncher({enterPresenter:()=>blockedCalls.push('presenter'),openAudience:()=>{blockedCalls.push('blockedPopup');return false;},isActive:()=>true,showSetup:()=>blockedCalls.push('setup'),session:{discover:async()=>{blockedCalls.push('permission');return {phase:'ready',screens:[screen(0,'讲稿屏'),screen(1920,'投影屏')],selected:1};},launch:()=>{throw new Error('must not fullscreen a blocked audience');}}});
+ assert.equal(await blockedLocal(),false);assert.deepEqual(blockedCalls,['presenter','permission','blockedPopup','setup']);
  assert.match(html,/requestFullscreen\(\{screen\}\)/);assert.match(html,/id="present" title="从当前幻灯片开始放映"/);
  assert.equal((html.match(/data-interaction-hint/g)||[]).length,3);
  // Digit confirmation/expiry share cleanup of both the buffer and its prompt.
  assert.match(html,/function resetNumberJump\(\) \{ clearTimeout\(numberTimer\); numberBuffer=''; clearTimeout\(toastTimer\); \$\('toast'\)\.hidden=true;/);
  assert.match(html,/const n = Number\(numberBuffer\); resetNumberJump\(\)/);
  assert.match(html,/setTimeout\(resetNumberJump, 3000\)/);
- console.log('PASS: fullscreen-before-companion-popup ordering, secure/support/denial/single/mirror fallbacks, popup-blocked late-fullscreen cancellation, fullscreen retry, initiating-screen retention, disconnect and cancelled discovery; digit prompt and authored hints.');
+ console.log('PASS: permission-before-audience local launch, target-screen popup, fullscreen ordering, secure/support/denial/single/mirror fallbacks, blocked-popup cancellation, retry, initiating-screen retention, disconnect and cancelled discovery; digit prompt and authored hints.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
