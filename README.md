@@ -114,7 +114,7 @@ skill 是模型读取的工作说明和资源包，不是后台服务。生成�
 
 HTML 支持离线播放，交互不在 PPTX 内运行。PowerPoint 网页版和其他演示软件是否允许打开本地 HTML，需由目标软件决定。完整操作见 [放映指南](references/presenting.md)。
 
-Windows 10/11 双击 [`scripts/present.cmd`](scripts/present.cmd)，默认打开脚本目录下的 `../assets/deck-template.html`，不存在时弹出文件选择器；拖放 HTML 可指定其他文稿。启动器使用系统自带的 PowerShell/.NET 和专用 Edge/Chrome 窗口，无需 Node.js、npm、Python 或额外下载。点击页面的“演示”，允许屏幕管理后，观众窗口自动在另一块屏幕全屏，主窗口保留讲稿。按 Q、Esc 或 Ctrl+C 一并关闭本次浏览器窗口和服务。CMD 与 HTML 始终是两个独立文件。
+Windows 10/11 双击 [`scripts/present.cmd`](scripts/present.cmd)，默认打开脚本目录下的 `../assets/deck-template.html`，不存在时弹出文件选择器；拖放 HTML 可指定其他文稿。启动器使用系统自带的 PowerShell/.NET 和专用 Edge/Chrome 窗口，无需 Node.js、npm、Python 或额外下载。初始窗口在启动脚本的屏幕居中，按可用区域适配为 **16:9**。点击页面的“演示”，允许屏幕管理后，观众窗口自动在另一块屏幕全屏，主窗口保留讲稿。按 Q、Esc 或 Ctrl+C 一并关闭本次浏览器窗口和服务。CMD 与 HTML 始终是两个独立文件。
 
 自动选择投影屏幕属于可选增强，系统需设为扩展显示。普通双窗口放映可直接打开 HTML；开发者及其他平台也可运行 `npm run present -- --html "presentation.html"`。启动参数、屏幕权限及手动放置步骤见[自动双屏](references/presenting.md#自动双屏先选观众屏再全屏观众窗口)。
 

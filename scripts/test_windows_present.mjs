@@ -127,7 +127,31 @@ async function waitForBrowser(run) {
   await until(() => existsSync(path.join(profile, 'fake-arguments.txt')), 'fake browser argument capture');
   return profile;
 }
+async function checkWindowBounds() {
+  const text = await fs.readFile(launcher, 'utf8');
+  const native = text.match(/function Initialize-PresentationWindow \{\r?\n    Add-Type -TypeDefinition @'\r?\n([\s\S]*?)\r?\n'@/);
+  assert.ok(native, 'standalone launcher contains its native placement helper');
+  const file = path.join(temp, 'window-placement.cs'); await fs.writeFile(file, native[1]);
+  const cases = [[0,0,1920,1040],[1920,0,2560,1400],[-1920,-120,1920,1040],[0,40,1080,1880],
+    [0,0,3440,1400],[0,0,3840,2080],[40,0,1280,720],[0,0,16,9],[0,0,0,0]];
+  const child = spawn(powershell || path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+    ['-NoLogo','-NoProfile','-Command', "$ErrorActionPreference='Stop'; Add-Type -TypeDefinition ([IO.File]::ReadAllText($env:PRESENT_TEST_WINDOW_SOURCE)); $results=@(foreach($work in (ConvertFrom-Json $env:PRESENT_TEST_WINDOW_CASES)) { [pscustomobject]@{work=$work; bounds=[PresentLaunchWindow]::Fit16By9([int[]]$work)} }); ConvertTo-Json -InputObject $results -Depth 5 -Compress"],
+    { env: { ...env, PRESENT_TEST_WINDOW_SOURCE: file, PRESENT_TEST_WINDOW_CASES: JSON.stringify(cases) }, windowsHide: true });
+  let output = '', errors = '';child.stdout.on('data',bytes=>{output+=bytes;});child.stderr.on('data',bytes=>{errors+=bytes;});
+  assert.equal((await once(child,'close'))[0],0,errors);
+  const results = JSON.parse(output.replace(/^\uFEFF/,''));
+  assert.equal(results.length,cases.length);
+  for (const {work,bounds} of results) {
+    if (!work[2]) { assert.equal(bounds,null); continue; }
+    const [left,top,width,height]=bounds;
+    assert.equal(width*9,height*16,'native initial window must be exactly 16:9');
+    assert.ok(left>=work[0]&&top>=work[1]&&left+width<=work[0]+work[2]&&top+height<=work[1]+work[3],'fit within the selected monitor work area');
+    assert.ok(Math.abs((left-work[0])*2+width-work[2])<=1&&Math.abs((top-work[1])*2+height-work[3])<=1,'center within that monitor, including negative coordinates');
+    if (work[2]>64&&work[3]>64) assert.ok(width+16>work[2]-48||height+9>work[3]-48,'use the largest fitting 16:9 window with margins');
+  }
+}
 try {
+  await checkWindowBounds();
   const help = launch(['--help']);
   assert.equal((await finished(help)).code, 0, help.output);
   assert.match(help.output, /Usage: present\.cmd/);
@@ -218,6 +242,9 @@ try {
   const browserArgs = (await fs.readFile(path.join(profile, 'fake-arguments.txt'), 'utf8')).replace(/^\uFEFF/, '').trim().split(/\r?\n/);
   assert.ok(browserArgs.includes(`--user-data-dir=${profile}`), browserArgs.join('\n'));
   assert.ok(browserArgs.includes(`--app=${browserUrl}`), browserArgs.join('\n'));
+  const size=browserArgs.find(arg=>arg.startsWith('--window-size='));assert.ok(size,browserArgs.join('\n'));
+  const [width,height]=size.slice('--window-size='.length).split(',').map(Number);assert.equal(width*9,height*16);
+  if(process.platform==='win32')assert.ok(browserArgs.some(arg=>arg.startsWith('--window-position=')),browserRun.output);
   assert.ok(!browserArgs.some(arg => /disable-web-security|kiosk|start-fullscreen/.test(arg)));
   const overlapping = launch([source, '--browser', executable], { keepInput: true });
   const temporaryProfile = await waitForBrowser(overlapping);
@@ -228,7 +255,7 @@ try {
   assert.equal((await stop(browserRun)).code, 0, 'Q closes only the owned browser and server');
   await fs.access(preferencesFile); // Normal dedicated profile persists for later consent.
   assert.deepEqual(await fs.readdir(launcherDir), ['present.cmd'], 'no helper files created beside the standalone launcher');
-  console.log(`PASS: ${powershell ? 'embedded PowerShell payload' : 'standalone Windows CMD with system-only PATH'}; default/explicit HTML selection, special paths, loopback HTTP, host/path isolation, scoped browser preferences, concurrent profile isolation and Q browser/server cleanup.`);
+  console.log(`PASS: ${powershell ? 'embedded PowerShell payload' : 'standalone Windows CMD with system-only PATH'}; centered 16:9 monitor bounds, default/explicit HTML, special paths, loopback HTTP, scoped browser profiles, concurrency and Q cleanup.`);
 } finally {
   for (const socket of sockets) socket.destroy();
   for (const run of children) await stop(run);

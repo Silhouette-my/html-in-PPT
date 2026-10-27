@@ -410,6 +410,12 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   function sameDisplay(a,b) {
     return !!a && !!b && (a===b || ['left','top','width','height'].every(key=>a[key]===b[key]));
   }
+  function presentationWindowBounds(screen) {
+    const availWidth=screen?.availWidth||1280,availHeight=screen?.availHeight||720;
+    const unit=Math.max(1,Math.floor(Math.min(Math.max(16,availWidth-48)/16,Math.max(9,availHeight-48)/9,80)));
+    const width=unit*16,height=unit*9;
+    return {left:Math.round((screen?.availLeft??screen?.left??0)+(availWidth-width)/2),top:Math.round((screen?.availTop??screen?.top??0)+(availHeight-height)/2),width,height};
+  }
   function isLocalPresenterLocation(location) {
     return location.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('local-present')==='1';
   }
@@ -634,7 +640,7 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   window.addEventListener('afterprint',()=>{if(controllerMode){$('controller-current').append($('stage'));document.body.classList.add('controller-mode');$('controller').hidden=false;fit();updatePresenter();}});
   function openPresenter(options={}){
     if(audienceWindow&&!audienceWindow.closed){enterController();if(options.focus!==false)audienceWindow.focus();syncAudience();return true;}
-    const screen=options.screen,placement=screen?`,left=${screen.availLeft+24},top=${screen.availTop+24},width=${Math.min(1280,screen.availWidth-48)},height=${Math.min(800,screen.availHeight-48)}`:',width=1280,height=720';
+    const bounds=presentationWindowBounds(options.screen||window.screen),placement=`,left=${bounds.left},top=${bounds.top},width=${bounds.width},height=${bounds.height}`;
     const win=window.open('','html-deck-audience','popup=yes'+placement);
     if(!win){toast('观众弹窗被阻止，请允许本页弹窗后重试。');return false;}
     audienceWindow=win;audienceIndex=-1;

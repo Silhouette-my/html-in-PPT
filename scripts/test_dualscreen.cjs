@@ -39,6 +39,13 @@ function fixture(overrides={}){
  f=fixture();let finish;f.env.requestFullscreen=()=>new Promise(resolve=>finish=resolve);await f.session.discover();const launch=f.session.launch();assert.equal(f.session.getState().phase,'starting');f.details.screens=[f.origin];f.emit();finish();await launch;assert.equal(f.session.getState().phase,'manual');assert.ok(f.calls.includes('cancelFullscreen'),'late fullscreen success must not revive a disconnected session');
  f=fixture();let allow;f.env.getScreens=()=>new Promise(resolve=>allow=resolve);const discovery=f.session.discover();f.session.dispose();allow(f.details);await discovery;assert.equal(f.listeners.size,0);assert.equal(f.popupCount,0,'cancelled permission discovery cannot orphan a popup');
  f=fixture();let firstPermission;f.env.getScreens=()=>new Promise(resolve=>firstPermission=resolve);const firstDiscovery=f.session.discover();assert.equal(f.session.getState().phase,'loading');f.session.cancelDetection();assert.equal(f.session.getState().phase,'idle');f.env.getScreens=async()=>f.details;await f.session.discover();assert.equal(f.session.getState().phase,'ready');firstPermission(f.details);await firstDiscovery;assert.equal(f.session.getState().phase,'ready','late cancelled permission cannot overwrite the reopened session');assert.equal(f.popupCount,0);
+ for(const screen of [{availLeft:1920,availTop:40,availWidth:2560,availHeight:1400},{availLeft:-1920,availTop:-120,availWidth:1920,availHeight:1040},{availLeft:0,availTop:0,availWidth:1080,availHeight:1880},{availLeft:0,availTop:0,availWidth:800,availHeight:560}]){
+  const bounds=context.presentationWindowBounds(screen);
+  assert.equal(bounds.width*9,bounds.height*16,'audience popup must open at 16:9');
+  assert.ok(bounds.left>=screen.availLeft&&bounds.top>=screen.availTop&&bounds.left+bounds.width<=screen.availLeft+screen.availWidth&&bounds.top+bounds.height<=screen.availTop+screen.availHeight);
+  assert.ok(Math.abs(bounds.left-screen.availLeft-(screen.availWidth-bounds.width)/2)<=.5);
+  assert.ok(Math.abs(bounds.top-screen.availTop-(screen.availHeight-bounds.height)/2)<=.5);
+ }
  // The CMD marker starts automatic placement only on a loopback HTTP page and
  // only after a presenter gesture; no permissions or windows are opened at load.
  for(const [address,expected] of [['http://127.0.0.1:8768/deck.html?local-present=1',true],['http://localhost:8768/?local-present=1',true],['https://example.com/?local-present=1',false],['file:///deck.html?local-present=1',false],['http://127.0.0.1:8768/deck.html',false]])assert.equal(context.isLocalPresenterLocation(new URL(address)),expected);

@@ -46,6 +46,7 @@ If the default is missing, a file picker opens. Drag/drop overrides the default.
 Only the selected, self-contained HTML is served on 127.0.0.1.
 No Node.js, npm, Python, installation or network download is required.
 Edge / Chrome opens with a dedicated profile for local popup/fullscreen settings.
+The initial window opens on the launcher's screen, centered at a 16:9 size.
 Click Presenter in the HTML and allow screen management for automatic dual screen.
 Keep this window open. Press Q, Esc or Ctrl+C to close the browser and server.
 '@
@@ -86,6 +87,118 @@ Keep this window open. Press Q, Esc or Ctrl+C to close the browser and server.
             $htmlPath = $argument
         }
     }
+}
+# Remember the launching Explorer before the file picker/browser changes focus.
+# Native placement follows the MIT source acknowledged below. The bounds use
+# physical pixels so negative monitor coordinates and mixed DPI remain valid.
+function Initialize-PresentationWindow {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class PresentLaunchWindow {
+    [StructLayout(LayoutKind.Sequential)] struct Point { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] struct MonitorInfo { public int Size; public Rect Bounds, Work; public uint Flags; }
+    delegate bool WindowCallback(IntPtr window, IntPtr data);
+    [DllImport("user32.dll")] static extern bool EnumWindows(WindowCallback callback, IntPtr data);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(Point point, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out Rect rect);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
+    [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr window);
+    [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr window, int command);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowLong(IntPtr window, int index);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr key, IntPtr data);
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    static IntPtr EnterDpi() {
+        try {
+            IntPtr old = SetThreadDpiAwarenessContext(new IntPtr(-4));
+            return old != IntPtr.Zero ? old : SetThreadDpiAwarenessContext(new IntPtr(-3));
+        } catch (EntryPointNotFoundException) { return IntPtr.Zero; }
+    }
+    static void LeaveDpi(IntPtr old) { if (old != IntPtr.Zero) SetThreadDpiAwarenessContext(old); }
+    public static int[] Fit16By9(int[] work) {
+        if (work == null || work.Length != 4 || work[2] < 16 || work[3] < 9) return null;
+        int padX = Math.Min(24, (work[2] - 16) / 2), padY = Math.Min(24, (work[3] - 9) / 2);
+        int unit = Math.Min((work[2] - 2 * padX) / 16, (work[3] - 2 * padY) / 9);
+        int width = unit * 16, height = unit * 9;
+        return new[] { work[0] + (work[2] - width) / 2, work[1] + (work[3] - height) / 2, width, height };
+    }
+    public static int[] Capture(long[] candidates) {
+        IntPtr old = EnterDpi();
+        try {
+            var sources = new HashSet<IntPtr>();
+            foreach (long candidate in candidates ?? new long[0]) sources.Add(GetAncestor(new IntPtr(candidate), 2));
+            IntPtr source = IntPtr.Zero;
+            EnumWindows(delegate(IntPtr window, IntPtr unused) {
+                if (sources.Contains(window) && IsWindowVisible(window)) { source = window; return false; }
+                return true;
+            }, IntPtr.Zero);
+            Point cursor;
+            GetCursorPos(out cursor);
+            IntPtr monitor = source != IntPtr.Zero ? MonitorFromWindow(source, 2) : MonitorFromPoint(cursor, 2);
+            var info = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
+            if (!GetMonitorInfo(monitor, ref info)) return null;
+            Rect r = info.Work;
+            return Fit16By9(new[] { r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top });
+        } finally { LeaveDpi(old); }
+    }
+    public static bool IsOwnedWindow(long handle, uint owner) {
+        uint actualOwner;
+        GetWindowThreadProcessId(new IntPtr(handle), out actualOwner);
+        return actualOwner == owner && IsWindowVisible(new IntPtr(handle));
+    }
+    public static bool RestoreWindowed(long handle, uint owner) {
+        if (!IsOwnedWindow(handle, owner)) return false;
+        IntPtr window = new IntPtr(handle);
+        if (IsZoomed(window)) ShowWindow(window, 9);
+        if ((GetWindowLong(window, -16) & 0x00c40000) != 0) return true;
+        return PostMessage(window, 0x0100, new IntPtr(0x7a), new IntPtr(0x00570001)) &&
+            PostMessage(window, 0x0101, new IntPtr(0x7a), new IntPtr(unchecked((int)0xc0570001)));
+    }
+    public static int[] Place(long handle, uint owner, int[] bounds) {
+        IntPtr old = EnterDpi();
+        try {
+            if (!IsOwnedWindow(handle, owner)) return null;
+            IntPtr window = new IntPtr(handle);
+            Rect r;
+            if (!GetWindowRect(window, out r)) return null;
+            if (r.Left != bounds[0] || r.Top != bounds[1] || r.Right - r.Left != bounds[2] || r.Bottom - r.Top != bounds[3]) {
+                SetWindowPos(window, IntPtr.Zero, bounds[0], bounds[1], bounds[2], bounds[3], 0x14);
+                if (!GetWindowRect(window, out r)) return null;
+            }
+            return new[] { r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top };
+        } finally { LeaveDpi(old); }
+    }
+}
+'@
+}
+$launchBounds = $null
+if (-not $noOpen -and [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+    $sourceWindows = @()
+    $shell = $null
+    try {
+        $shell = New-Object -ComObject Shell.Application
+        foreach ($window in $shell.Windows()) {
+            try {
+                foreach ($item in $window.Document.SelectedItems()) {
+                    if ($item.Path -ieq $env:PRESENT_CMD_SELF) { $sourceWindows += [long]$window.HWND; break }
+                }
+            } catch {}
+        }
+    } catch {} finally {
+        if ($shell) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell) }
+    }
+    try {
+        Initialize-PresentationWindow
+        $launchBounds = [PresentLaunchWindow]::Capture([long[]]$sourceWindows)
+    } catch { Write-Warning "Could not determine the launch screen. $($_.Exception.Message)" }
 }
 if ($null -eq $htmlPath) {
     $defaultFile = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetDirectoryName($env:PRESENT_CMD_SELF)) '../assets/deck-template.html'))
@@ -175,7 +288,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 #>
-$browserState = @{ Process = $null; Path = $null; Lock = $null; OwnerFile = $null; Temporary = $false }
+$browserState = @{ Process = $null; Path = $null; Lock = $null; OwnerFile = $null; Temporary = $false;
+    Window = 0L; WindowSince = $null; PlaceUntil = $null; WindowedRequested = $false; PageServed = $false }
 function Start-PresentationBrowser([string]$Executable) {
     $root = $env:PRESENT_CMD_PROFILE_ROOT
     if (-not $root) { $root = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'html-in-PPT' }
@@ -223,9 +337,42 @@ function Start-PresentationBrowser([string]$Executable) {
     Move-Item -LiteralPath ($preferences + '.tmp') -Destination $preferences -Force
     $arguments = @('--no-first-run', '--no-default-browser-check', '--disable-background-mode',
         ('--user-data-dir="{0}"' -f $browserState.Path), ('--app="{0}"' -f $url))
+    if ($launchBounds) {
+        $arguments += ('--window-position={0},{1}' -f $launchBounds[0], $launchBounds[1])
+        $arguments += ('--window-size={0},{1}' -f $launchBounds[2], $launchBounds[3])
+        $browserState.PlaceUntil = [DateTime]::UtcNow.AddSeconds(15)
+    } else { $arguments += '--window-size=1280,720' }
     $browserState.Process = Start-Process -FilePath $Executable -ArgumentList $arguments -PassThru
     if ($browserState.OwnerFile) { [IO.File]::WriteAllText($browserState.OwnerFile, [string]$browserState.Process.Id) }
     Write-Host "Browser profile: $($browserState.Path)"
+}
+
+function Update-PresentationWindow {
+    if (-not $browserState.PlaceUntil -or -not $browserState.Process) { return }
+    if ([DateTime]::UtcNow -gt $browserState.PlaceUntil) { $browserState.PlaceUntil = $null; return }
+    if (-not $browserState.Window) {
+        try {
+            $browserState.Process.Refresh()
+            $handle = $browserState.Process.MainWindowHandle.ToInt64()
+        } catch [InvalidOperationException] {
+            if ($browserState.Process.HasExited) { $browserState.PlaceUntil = $null; return }
+            throw
+        }
+        if (-not $handle -or -not [PresentLaunchWindow]::IsOwnedWindow($handle, [uint32]$browserState.Process.Id)) { return }
+        # Remember only the initial app window, never a later audience popup.
+        $browserState.Window = $handle
+        $browserState.WindowSince = [DateTime]::UtcNow
+    }
+    if (-not $browserState.WindowedRequested -and $browserState.PageServed -and ([DateTime]::UtcNow - $browserState.WindowSince).TotalSeconds -ge 0.25) {
+        $browserState.WindowedRequested = [PresentLaunchWindow]::RestoreWindowed($browserState.Window, [uint32]$browserState.Process.Id)
+    }
+    $rect = [PresentLaunchWindow]::Place($browserState.Window, [uint32]$browserState.Process.Id, [int[]]$launchBounds)
+    if ($rect -and $browserState.WindowedRequested -and ([DateTime]::UtcNow - $browserState.WindowSince).TotalSeconds -ge 1) {
+        if (@(0..3 | Where-Object { $rect[$_] -ne $launchBounds[$_] }).Count -eq 0) {
+            $browserState.PlaceUntil = $null
+            Write-Host ('Window placement: {0},{1} {2}x{3}' -f $rect[0], $rect[1], $rect[2], $rect[3])
+        }
+    }
 }
 
 function Stop-PresentationBrowser {
@@ -302,6 +449,7 @@ try {
             else { $stdinTask = $stdinStream.ReadAsync($stdinByte, 0, 1) }
         }
         if ($browserState.Process -and $browserState.Process.HasExited) { break }
+        Update-PresentationWindow
         # Browsers may preconnect without sending a request. Keep those sockets
         # separate so an idle connection cannot block the actual presentation.
         for ($accepted = 0; $accepted -lt 8 -and $listener.Pending(); $accepted++) {
@@ -352,6 +500,7 @@ try {
                         Send-Response $client 302 $emptyBody $headOnly "Location: ${route}?local-present=1`r`n"
                     } elseif ($requested -ceq $route) {
                         Send-Response $client 200 $html $headOnly
+                        if (-not $headOnly) { $browserState.PageServed = $true }
                     } else {
                         Send-Response $client 404 $emptyBody $headOnly
                     }

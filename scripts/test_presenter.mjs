@@ -99,6 +99,8 @@ try {
       const origin={left:0,top:0,width:1920,height:1080,availLeft:0,availTop:0,availWidth:1920,availHeight:1040,label:'Presenter'};
       const audience={...origin,left:1920,availLeft:1920,label:'Audience'};
       window.screenRequests=0;window.fullscreenTargets=[];
+      const open=window.open.bind(window);window.popupFeatures=[];
+      window.open=(url,name,features)=>{window.popupFeatures.push(features);return open(url,name,features);};
       window.getScreenDetails=async()=>{window.screenRequests++;return {screens:[origin,audience],currentScreen:origin,addEventListener(){},removeEventListener(){}};};
       Element.prototype.requestFullscreen=function(options){window.fullscreenTargets.push(options?.screen?.label||'default');return Promise.resolve();};
     });
@@ -110,6 +112,9 @@ try {
     await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='presenting');
     assert.equal(await localPage.evaluate(()=>window.screenRequests),1);
     assert.deepEqual(await localAudience.evaluate(()=>window.fullscreenTargets),['Audience']);
+    const features=await localPage.evaluate(()=>window.popupFeatures[0]);
+    const popupWidth=Number(features.match(/width=(\d+)/)[1]),popupHeight=Number(features.match(/height=(\d+)/)[1]);
+    assert.equal(popupWidth*9,popupHeight*16,'the actual popup request uses 16:9');
     assert.equal(await localPage.locator('#controller').isVisible(),true);
     assert.equal(await localAudience.locator('#controller,.speaker-note').count(),0);
     await localPage.locator('#controller-end').click();
