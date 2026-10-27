@@ -114,7 +114,7 @@ skill 是模型读取的工作说明和资源包，不是后台服务。生成�
 
 HTML 支持离线播放，交互不在 PPTX 内运行。PowerPoint 网页版和其他演示软件是否允许打开本地 HTML，需由目标软件决定。完整操作见 [放映指南](references/presenting.md)。
 
-自动选择投影屏幕属于可选增强；只有浏览器的 `file://` 页面无法请求屏幕管理能力时，才需运行 `npm run present -- --html "presentation.html"`。普通双窗口放映直接打开 HTML 即可。扩展显示、权限和手动放置步骤见[自动双屏](references/presenting.md#自动双屏先选观众屏再全屏观众窗口)。
+自动选择投影屏幕属于可选增强；浏览器的 `file://` 页面无法请求屏幕管理能力时，可使用本机 HTTP 入口。Windows 10/11 双击 [`scripts/present.cmd`](scripts/present.cmd) 选择文稿，或把 HTML 拖到脚本上；单文件启动器使用系统自带的 PowerShell/.NET，无需 Node.js、npm、Python 或额外下载。保留终端，按 Q 或 Ctrl+C 停止。开发者及其他平台仍可运行 `npm run present -- --html "presentation.html"`。普通双窗口放映直接打开 HTML 即可。扩展显示、权限和手动放置步骤见[自动双屏](references/presenting.md#自动双屏先选观众屏再全屏观众窗口)。
 
 ## 文档与开发
 
@@ -127,7 +127,7 @@ HTML 支持离线播放，交互不在 PPTX 内运行。PowerPoint 网页版和�
 
 修改页面内容时编辑模板的 `DECK CONTENT START/END` 区域；修改交互时编辑模板内联脚本；修改导出时从 `scripts/export_deck.mjs` 入手。`scripts/new_deck.py` 是可选的 Python 3 模板复制工具，不会自动写作，也不是导出的前置依赖。
 
-准备好 npm 依赖和 Chromium 后运行 `npm test`。测试覆盖步骤状态、双端路径与快捷键、真实 10 页截图导出、图片顺序和尺寸、首页链接、ZIP 内容及拒绝覆盖等行为。[GitHub Actions](https://github.com/Silhouette-my/html-in-PPT/actions/workflows/platform-tests.yml) 在 Windows/macOS 执行同一套检查。
+准备好 npm 依赖和 Chromium 后运行 `npm test`。测试覆盖步骤状态、双端路径与快捷键、真实 10 页截图导出、图片顺序和尺寸、首页链接、ZIP 内容及拒绝覆盖等行为。[GitHub Actions](https://github.com/Silhouette-my/html-in-PPT/actions/workflows/platform-tests.yml) 在 Windows/macOS 执行同一套检查。Windows 另检查单文件 `present.cmd` 的启动、特殊字符路径、HTTP 访问范围与退出后端口释放，测试子进程的 PATH 中不包含 Node.js/npm/Python。此项可单独运行 `node scripts/test_windows_present.mjs`；测试工具使用 Node.js，启动器自身不依赖它。
 
 macOS PowerPoint 已打开本轮生成的 3 页中文备注样例，检查了两段讲稿、两条要点、操作/过渡提示，并验证备注可编辑。Windows Office 尚未实测；Windows/macOS 的真实双屏、权限提示和观众窗口重连仍需目标设备确认。模拟测试不能替代这些现场检查。自动化也不判断内容和审美。
 

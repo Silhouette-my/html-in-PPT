@@ -58,7 +58,29 @@ PPTX 原生备注可在 PowerPoint 中查看和编辑。修改内容时让 agent
 
 新版 Chrome / Edge 可通过 Window Management API 选择显示器并辅助放置观众窗口。系统需设为“扩展”而非“镜像”；需要用户授权屏幕访问，并允许观众弹窗。浏览器可能不支持从 `file://` 页面请求屏幕管理权限，此时可用本机 HTTP 入口。自动选屏不是普通放映的前提，手动拖动始终可用。
 
-只有需要自动选屏且浏览器不支持 `file://` 屏幕管理时，才从仓库根目录运行：
+只有需要自动选屏且浏览器不支持 `file://` 屏幕管理时，才需要本机 HTTP 入口。
+
+### Windows：单文件启动器
+
+Windows 10/11 可直接双击 [`scripts/present.cmd`](../scripts/present.cmd)，在文件选择器中选择 HTML；也可以把一个 HTML 文件拖放到脚本上。只需保留 `present.cmd` 和自包含 HTML 文稿，不需要安装 Node.js、npm、Python 或第三方依赖，也不会下载其他启动文件。启动器使用 Windows 自带的 PowerShell 5.1/.NET，内嵌代码在内存中执行，不生成辅助脚本。
+
+从仓库根目录也可使用以下命令。PowerShell 中在路径前加 `./`，例如 `./scripts/present.cmd "presentation.html"`：
+
+```bat
+scripts\present.cmd "presentation.html"
+scripts\present.cmd --html "presentation.html" --port 8768 --no-open
+scripts\present.cmd --help
+```
+
+默认使用随机可用端口，并打开系统默认浏览器；`--port` 指定固定端口，`--no-open` 只显示地址。路径包含空格时加引号，支持中文文件名。双击后取消文件选择会直接退出；启动失败时保留错误提示。
+
+服务只监听 `127.0.0.1`，只提供选中的 `.html` / `.htm` 文件，不开放文稿目录；外部图片、字体、脚本等相对路径资源不会由启动器提供，请使用自包含 HTML。服务运行期间保留终端，按 **Q** 正常停止，或按 Ctrl+C 中断；退出会释放端口，不自动关闭已打开的浏览器窗口。修改文稿后需重新启动。
+
+启动后在 HTML 中按下方顺序开启自动双屏。启动器提供 HTTP 入口，屏幕选择、弹窗和全屏仍由 HTML 与浏览器处理，需要相应 API 支持及用户授权。
+
+### Node.js：保留现有命令
+
+开发者及其他平台用户可继续从仓库根目录运行：
 
 ```bash
 npm run present -- --html "presentation.html"
@@ -72,7 +94,7 @@ npm run present -- --html "presentation.html"
 npm run present -- --html "presentation.html" --port 8768 --no-open
 ```
 
-操作顺序：
+### 自动双屏操作顺序
 
 1. 点击“演示”打开观众窗口，确认两个窗口均正常。
 2. 在“双屏设置”中点击“检测屏幕 / 请求权限”，在浏览器提示中允许访问屏幕信息。
