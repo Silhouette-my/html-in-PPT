@@ -410,11 +410,27 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   function sameDisplay(a,b) {
     return !!a && !!b && (a===b || ['left','top','width','height'].every(key=>a[key]===b[key]));
   }
-  function presentationWindowBounds(screen) {
+  function presentationWindowBounds(screen,presenter={}) {
     const availWidth=screen?.availWidth||1280,availHeight=screen?.availHeight||720;
-    const unit=Math.max(1,Math.floor(Math.min(Math.max(16,availWidth-48)/16,Math.max(9,availHeight-48)/9,80)));
-    const width=unit*16,height=unit*9;
+    const preferredWidth=presenter.outerWidth||presenter.innerWidth||1280;
+    const width=Math.max(1,Math.floor(Math.min(preferredWidth,availWidth,availHeight*16/9)));
+    const height=Math.max(1,Math.min(availHeight,Math.round(width*9/16)));
     return {left:Math.round((screen?.availLeft??screen?.left??0)+(availWidth-width)/2),top:Math.round((screen?.availTop??screen?.top??0)+(availHeight-height)/2),width,height};
+  }
+  function presentationPopupSize(bounds,presenter={}) {
+    // window.open sizes the viewport; resizeTo sizes the complete window.
+    const frameWidth=presenter.outerWidth>0&&presenter.innerWidth>0?Math.max(0,presenter.outerWidth-presenter.innerWidth):0;
+    const frameHeight=presenter.outerHeight>0&&presenter.innerHeight>0?Math.max(0,presenter.outerHeight-presenter.innerHeight):0;
+    return {width:Math.max(1,Math.floor(bounds.width-frameWidth)),height:Math.max(1,Math.floor(bounds.height-frameHeight))};
+  }
+  function placeAudienceWindow(win,bounds,fullscreenPending=false) {
+    if(!win||win.closed||fullscreenPending)return false;
+    try {
+      if(win.document.fullscreenElement)return false;
+      if(win.outerWidth!==bounds.width||win.outerHeight!==bounds.height)win.resizeTo(bounds.width,bounds.height);
+      if(win.screenX!==bounds.left||win.screenY!==bounds.top)win.moveTo(bounds.left,bounds.top);
+      return true;
+    } catch {return false;}
   }
   function isLocalPresenterLocation(location) {
     return location.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('local-present')==='1';
@@ -639,9 +655,9 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   window.addEventListener('beforeprint',()=>{if(controllerMode){$('main').prepend($('stage'));document.body.classList.remove('controller-mode');$('controller').hidden=true;}});
   window.addEventListener('afterprint',()=>{if(controllerMode){$('controller-current').append($('stage'));document.body.classList.add('controller-mode');$('controller').hidden=false;fit();updatePresenter();}});
   function openPresenter(options={}){
-    if(audienceWindow&&!audienceWindow.closed){enterController();if(options.focus!==false)audienceWindow.focus();syncAudience();return true;}
-    const bounds=presentationWindowBounds(options.screen||window.screen),placement=`,left=${bounds.left},top=${bounds.top},width=${bounds.width},height=${bounds.height}`;
-    const win=window.open('','html-deck-audience','popup=yes'+placement);
+    if(audienceWindow&&!audienceWindow.closed){enterController();fitAudienceWindow(options.screen);if(options.focus!==false)audienceWindow.focus();syncAudience();return true;}
+    const bounds=presentationWindowBounds(options.screen||window.screen,window),size=presentationPopupSize(bounds,window),placement=`,left=${bounds.left},top=${bounds.top},width=${size.width},height=${size.height}`;
+    const win=window.open('','html-deck-audience','popup=yes,resizable=yes'+placement);
     if(!win){toast('观众弹窗被阻止，请允许本页弹窗后重试。');return false;}
     audienceWindow=win;audienceIndex=-1;
     const doc=win.document;doc.open();doc.write('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>观众画面 · PowerPoint</title><style>'+document.querySelector('style').textContent+'\nhtml,body{margin:0;height:100%;overflow:hidden;background:#111}body{display:grid;place-items:center}#audience-stage{position:relative;overflow:hidden}#audience-surface{position:relative;width:1600px;height:900px;transform-origin:top left}#audience-slide>.slide{display:block;box-shadow:none}#audience-ink{position:absolute;inset:0;width:1600px;height:900px;pointer-events:none;z-index:5}#audience-laser{position:absolute;width:16px;height:16px;border-radius:50%;background:#f22;box-shadow:0 0 8px 3px #ff202090;transform:translate(-50%,-50%);z-index:6;pointer-events:none}#audience-blank{position:fixed;inset:0;z-index:20}body .step-hidden{visibility:hidden!important;opacity:0!important;pointer-events:none!important}</style></head><body><main id="audience-stage"><div id="audience-surface"><div id="audience-slide"></div><canvas id="audience-ink" width="1600" height="900"></canvas><div id="audience-laser" hidden></div></div></main><div id="audience-blank" hidden></div></body></html>');doc.close();
@@ -677,7 +693,15 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     });
     win.addEventListener('resize',fitAudience);doc.addEventListener('visibilitychange',()=>{syncEffects();});
     win.addEventListener('pagehide',()=>{if(audienceWindow===win){audienceIndex=-1;queueMicrotask(()=>{updatePresenter();syncEffects();});}});
-    enterController();syncAudience(true);syncEffects();if(options.focus!==false)window.focus();return true;
+    enterController();fitAudienceWindow(options.screen);syncAudience(true);syncEffects();
+    // Browser decorations can settle after opening. Never resize or move a
+    // popup once its cross-screen fullscreen request has started.
+    requestAnimationFrame(()=>{if(audienceWindow===win)fitAudienceWindow(options.screen);});
+    if(options.focus!==false)window.focus();return true;
+  }
+  function fitAudienceWindow(screen){
+    if(!audienceWindow||audienceWindow.closed||audienceFullscreenTarget)return;
+    placeAudienceWindow(audienceWindow,presentationWindowBounds(screen||audienceWindow.screen||window.screen,window));
   }
   function audiencePoint(event){const rect=audienceWindow.document.getElementById('audience-stage').getBoundingClientRect();return {x:(event.clientX-rect.left)*1600/rect.width,y:(event.clientY-rect.top)*900/rect.height};}
   async function requestAudienceFullscreen(screen=null){
@@ -691,6 +715,7 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   window.addEventListener('pagehide', () => { if (audienceWindow && !audienceWindow.closed) audienceWindow.close(); });
   setInterval(updateTimer, 500);
   new ResizeObserver(fit).observe($('stage')); window.addEventListener('resize', fit); window.addEventListener('hashchange', fromHash);
+  window.addEventListener('resize',()=>fitAudienceWindow());
 
   const menuIds = ['file-menu','present-menu','edit-menu','more-menu','show-tools'];
   function closeMenus() {
