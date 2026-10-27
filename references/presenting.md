@@ -62,21 +62,26 @@ PPTX 原生备注可在 PowerPoint 中查看和编辑。修改内容时让 agent
 
 ### Windows：单文件启动器
 
-Windows 10/11 可直接双击 [`scripts/present.cmd`](../scripts/present.cmd)，在文件选择器中选择 HTML；也可以把一个 HTML 文件拖放到脚本上。只需保留 `present.cmd` 和自包含 HTML 文稿，不需要安装 Node.js、npm、Python 或第三方依赖，也不会下载其他启动文件。启动器使用 Windows 自带的 PowerShell 5.1/.NET，内嵌代码在内存中执行，不生成辅助脚本。
+Windows 10/11 可直接双击 [`scripts/present.cmd`](../scripts/present.cmd)。默认文稿是**相对 CMD 所在目录**的 `../assets/deck-template.html`；只有该文件不存在时才弹出选择窗口。把一个 HTML 文件拖放到脚本上，或使用 `--html`，可优先指定其他文稿。
+
+CMD 与 HTML 是两个独立文件，页面内容从选中的 HTML 读取。启动器使用 Windows 自带的 PowerShell 5.1/.NET，不需要 Node.js、npm、Python 或第三方包，也不会下载启动文件、把 HTML 合并进 CMD 或生成临时 HTML。
 
 从仓库根目录也可使用以下命令。PowerShell 中在路径前加 `./`，例如 `./scripts/present.cmd "presentation.html"`：
 
 ```bat
 scripts\present.cmd "presentation.html"
 scripts\present.cmd --html "presentation.html" --port 8768 --no-open
+scripts\present.cmd --browser "C:\Program Files\Google\Chrome\Application\chrome.exe"
 scripts\present.cmd --help
 ```
 
-默认使用随机可用端口，并打开系统默认浏览器；`--port` 指定固定端口，`--no-open` 只显示地址。路径包含空格时加引号，支持中文文件名。双击后取消文件选择会直接退出；启动失败时保留错误提示。
+默认从 `8768` 到 `8778` 依次尝试可用端口，通常复用同一地址以保留屏幕授权；`--port` 可指定固定端口，占用时明确报错。`--no-open` 只启动服务并显示地址。路径包含空格时加引号，支持中文文件名。取消文件选择会直接退出；启动失败时保留错误提示。
 
-服务只监听 `127.0.0.1`，只提供选中的 `.html` / `.htm` 文件，不开放文稿目录；外部图片、字体、脚本等相对路径资源不会由启动器提供，请使用自包含 HTML。服务运行期间保留终端，按 **Q** 正常停止，或按 Ctrl+C 中断；退出会释放端口，不自动关闭已打开的浏览器窗口。修改文稿后需重新启动。
+启动器优先查找 Edge，再查找 Chrome，也可用 `--browser` 指定路径。它为本次放映打开专用应用窗口，配置保存在 `%LOCALAPPDATA%\html-in-PPT`。只为当前 `http://127.0.0.1:<端口>` 来源启用弹窗与自动全屏，屏幕管理权限仍由浏览器询问。并发启动会使用独立配置；浏览器正常配置、系统注册表与全局策略均无需调整。复制地址到其他浏览器或使用 `--no-open` 时，需按该浏览器的实际权限操作。
 
-启动后在 HTML 中按下方顺序开启自动双屏。启动器提供 HTTP 入口，屏幕选择、弹窗和全屏仍由 HTML 与浏览器处理，需要相应 API 支持及用户授权。
+在系统设置中选择扩展显示，点击页面的“演示”，允许浏览器访问屏幕信息。模板会自动选择另一块屏幕并请求观众窗口全屏，讲稿留在主窗口；需要更换观众屏时使用“双屏设置”。权限被拒绝、单屏或 API 不支持时，保留观众窗口并显示手动操作入口。打开页面本身不会请求屏幕权限。
+
+服务只监听 `127.0.0.1`，只提供选中的 `.html` / `.htm` 文件，不开放文稿目录；外部图片、字体、脚本等相对路径资源不会由启动器提供，请使用自包含 HTML。运行期间保留终端，按 **Q**、**Esc** 或 **Ctrl+C** 一并关闭本次放映浏览器与服务，无需批处理终止确认；直接关闭专用浏览器也会停止服务。修改独立 HTML 后需重启。CMD 传入 `local-present=1` 标记，由模板中的 JavaScript 执行选屏；其他 HTML 需包含相应双屏逻辑。
 
 ### Node.js：保留现有命令
 
@@ -94,7 +99,7 @@ npm run present -- --html "presentation.html"
 npm run present -- --html "presentation.html" --port 8768 --no-open
 ```
 
-### 自动双屏操作顺序
+### 其他入口的自动双屏操作顺序
 
 1. 点击“演示”打开观众窗口，确认两个窗口均正常。
 2. 在“双屏设置”中点击“检测屏幕 / 请求权限”，在浏览器提示中允许访问屏幕信息。

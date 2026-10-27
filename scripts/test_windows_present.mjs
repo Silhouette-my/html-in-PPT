@@ -2,6 +2,7 @@
 // On other hosts, --powershell <pwsh> exercises the embedded payload only.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
@@ -19,6 +20,7 @@ const launcherDir = path.join(temp, "启动器 & (test) ! ' %");
 await fs.mkdir(launcherDir);
 const launcher = path.join(launcherDir, 'present.cmd');
 await fs.copyFile(fileURLToPath(new URL('./present.cmd', import.meta.url)), launcher);
+assert.doesNotMatch(await fs.readFile(launcher, 'utf8'), /<!doctype|<!-- === HIT HTML|HIT-GZIP/i, 'CMD must not embed a presentation');
 const source = path.join(temp, "文稿 & (test) ! ' # % [1].html");
 const html = Buffer.from('<!doctype html><meta charset="utf-8"><title>双屏测试</title><p>你好 🌏</p>');
 await fs.writeFile(source, html);
@@ -26,6 +28,7 @@ await fs.writeFile(path.join(temp, 'secret.txt'), 'must never be served');
 const children = new Set();
 const sockets = new Set();
 const env = { ...process.env };
+env.PRESENT_CMD_PROFILE_ROOT = path.join(temp, 'browser profiles');
 if (process.platform === 'win32') {
   const systemRoot = process.env.SystemRoot;
   // Use the absolute Node executable for this test, but give the launcher only Windows tools.
@@ -35,7 +38,7 @@ if (process.platform === 'win32') {
     assert.notEqual(spawnSync('where.exe', [tool], { env, cwd: launcherDir }).status, 0, `${tool} must be absent from launcher PATH`);
   }
 }
-function launch(args) {
+function launch(args, { keepInput = false, cwd = launcherDir } = {}) {
   const childEnv = { ...env, PRESENT_CMD_SELF: launcher, PRESENT_CMD_ARG_COUNT: String(args.length), PRESENT_TEST_CMD: launcher };
   args.forEach((value, index) => {
     childEnv[`PRESENT_TEST_ARG_${index}`] = value;
@@ -46,12 +49,12 @@ function launch(args) {
   const argv = powershell
     ? ['-NoLogo', '-NoProfile', '-Command', "$ErrorActionPreference='Stop'; try { $s=[IO.File]::ReadAllText($env:PRESENT_CMD_SELF); $m='#'+' POWERSHELL_PAYLOAD'; & ([scriptblock]::Create($s.Substring($s.IndexOf($m)+$m.Length))) } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }"]
     : ['/d', '/s', '/c', `""%PRESENT_TEST_CMD%" ${expansion}"`];
-  const child = spawn(command, argv, { env: childEnv, cwd: launcherDir, windowsHide: true, windowsVerbatimArguments: !powershell });
+  const child = spawn(command, argv, { env: childEnv, cwd, windowsHide: true, windowsVerbatimArguments: !powershell });
   const run = { child, output: '', error: undefined };
   run.closed = new Promise(resolve => { child.once('error', error => { run.error = error; resolve({ code: null }); }); child.once('close', code => resolve({ code })); });
   child.stdout.on('data', bytes => { run.output += bytes; });
   child.stderr.on('data', bytes => { run.output += bytes; });
-  child.stdin.end(); // Error-path PAUSE must also finish without a human in CI.
+  if (!keepInput) child.stdin.end(); // Error-path PAUSE must finish without a human in CI.
   children.add(run);
   return run;
 }
@@ -72,13 +75,17 @@ async function finished(run) {
   return result;
 }
 async function stop(run) {
+  if (run.child.exitCode === null && run.child.stdin.writable) {
+    run.child.stdin.end('q');
+    await Promise.race([run.closed, new Promise(resolve => setTimeout(resolve, 5000))]);
+  }
   if (run.child.exitCode === null) {
     if (process.platform === 'win32') {
       const killer = spawn('taskkill.exe', ['/PID', String(run.child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
       await once(killer, 'close');
     } else run.child.kill('SIGTERM');
   }
-  await finished(run);
+  return finished(run);
 }
 async function rawRequest(port, request) {
   const socket = net.createConnection({ host: '127.0.0.1', port });
@@ -91,6 +98,34 @@ async function rawRequest(port, request) {
   await once(socket, 'end');
   socket.destroy(); sockets.delete(socket);
   return Buffer.concat(chunks).toString();
+}
+async function fakeBrowser() {
+  if (process.platform !== 'win32') {
+    const file = path.join(temp, 'fake-browser.sh');
+    await fs.writeFile(file, '#!/bin/sh\nfor arg do\n case "$arg" in --user-data-dir=*) profile=${arg#--user-data-dir=};; esac\ndone\nprintf "%s\\n" "$@" > "$profile/fake-arguments.txt"\nexec /bin/sleep 120\n', { mode: 0o755 });
+    return file;
+  }
+  const file = path.join(temp, 'fake-browser.exe'), source = path.join(temp, 'fake-browser.cs');
+  await fs.writeFile(source, `using System; using System.IO; using System.Threading;
+public class FakeBrowser { public static void Main(string[] args) {
+  string profile = null;
+  foreach (string arg in args) if (arg.StartsWith("--user-data-dir=")) profile = arg.Substring(16);
+  File.WriteAllLines(Path.Combine(profile, "fake-arguments.txt"), args);
+  Thread.Sleep(120000);
+}}`);
+  const compiler = spawn(path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+    ['-NoLogo', '-NoProfile', '-Command', 'Add-Type -TypeDefinition ([IO.File]::ReadAllText($env:PRESENT_TEST_SOURCE)) -OutputAssembly $env:PRESENT_TEST_EXE -OutputType ConsoleApplication'],
+    { env: { ...env, PRESENT_TEST_SOURCE: source, PRESENT_TEST_EXE: file }, windowsHide: true });
+  let errors = ''; compiler.stderr.on('data', bytes => { errors += bytes; });
+  assert.equal((await once(compiler, 'close'))[0], 0, errors);
+  return file;
+}
+async function waitForBrowser(run) {
+  await until(() => /Browser profile: (.+)/.test(run.output) || run.child.exitCode !== null, 'owned browser startup');
+  const profile = run.output.match(/Browser profile: ([^\r\n]+)/)?.[1];
+  assert.ok(profile, run.output);
+  await until(() => existsSync(path.join(profile, 'fake-arguments.txt')), 'fake browser argument capture');
+  return profile;
 }
 try {
   const help = launch(['--help']);
@@ -113,13 +148,25 @@ try {
     assert.doesNotMatch(run.output, /Presentation: http/);
   } finally { await new Promise(resolve => occupied.close(resolve)); }
 
-  const run = launch(['--html', source, '--no-open']);
+  const defaultDirectory = path.join(temp, 'assets');
+  await fs.mkdir(defaultDirectory);
+  await fs.writeFile(path.join(defaultDirectory, 'deck-template.html'), '<title>Default independent HTML</title>');
+  const defaults = launch(['--no-open'], { keepInput: true, cwd: temp });
+  await until(() => /Presentation: (http:\/\/\S+)/.test(defaults.output) || defaults.child.exitCode !== null, 'default template from a different working directory');
+  const defaultUrl = defaults.output.match(/Presentation: (http:\/\/\S+)/)?.[1];
+  assert.ok(defaultUrl, defaults.output);
+  assert.equal(new URL(defaultUrl).pathname, '/deck-template.html');
+  assert.equal(await (await fetch(defaultUrl)).text(), '<title>Default independent HTML</title>');
+  assert.equal((await stop(defaults)).code, 0, 'Q stops the default presentation normally');
+
+  const run = launch(['--html', source, '--no-open'], { keepInput: true });
   await until(() => /Presentation: (http:\/\/\S+)/.test(run.output) || run.child.exitCode !== null || run.error, 'server startup');
   assert.ifError(run.error);
   const match = run.output.match(/Presentation: (http:\/\/\S+)/);
   assert.ok(match, run.output);
   const address = match[1], url = new URL(address), port = Number(url.port);
   assert.equal(url.hostname, '127.0.0.1');
+  assert.equal(url.searchParams.get('local-present'), '1');
   assert.equal(decodeURIComponent(url.pathname.slice(1)), path.basename(source));
   const idle = net.createConnection({ host: '127.0.0.1', port });
   sockets.add(idle); await once(idle, 'connect');
@@ -129,34 +176,59 @@ try {
   assert.equal(response.headers.get('content-length'), String(html.length));
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(response.headers.get('permissions-policy'), 'window-management=(self)');
   assert.match(response.headers.get('content-type'), /text\/html; charset=utf-8/);
   idle.destroy(); sockets.delete(idle);
-  assert.deepEqual(Buffer.from(await (await fetch(`${address}?audience=1`)).arrayBuffer()), html);
+  const audienceUrl = new URL(address); audienceUrl.searchParams.set('audience', '1');
+  assert.deepEqual(Buffer.from(await (await fetch(audienceUrl)).arrayBuffer()), html);
   const head = await fetch(address, { method: 'HEAD' });
   assert.equal(head.status, 200); assert.equal(await head.text(), '');
   assert.equal(head.headers.get('content-length'), String(html.length));
   const post = await fetch(address, { method: 'POST' });
   assert.equal(post.status, 405); assert.equal(post.headers.get('allow'), 'GET, HEAD');
   const root = await fetch(url.origin, { redirect: 'manual' });
-  assert.equal(root.status, 302); assert.equal(root.headers.get('location'), url.pathname);
+  assert.equal(root.status, 302); assert.equal(root.headers.get('location'), url.pathname + url.search);
   for (const route of ['/secret.txt', '/present.cmd', '/%2e%2e/secret.txt', '/deck.html']) {
     assert.equal((await fetch(`${url.origin}${route}`)).status, 404, route);
   }
   assert.match(await rawRequest(port, 'garbage\r\n\r\n'), /^HTTP\/1\.1 400 /);
+  assert.match(await rawRequest(port, `GET / HTTP/1.1\r\nHost: example.com:${port}\r\n\r\n`), /^HTTP\/1\.1 400 /);
   assert.match(await rawRequest(port, 'GET / HTTP/1.1\r\nX-Large: ' + 'x'.repeat(17000) + '\r\n\r\n'), /^HTTP\/1\.1 431 /);
   await fs.writeFile(source, 'changed after startup');
   assert.deepEqual(Buffer.from(await (await fetch(address)).arrayBuffer()), html, 'serve the startup snapshot');
-  await stop(run);
+  assert.equal((await stop(run)).code, 0, 'Q exits without killing the launcher');
   await assert.rejects(fetch(address, { signal: AbortSignal.timeout(2000) }));
   await fs.writeFile(source, html);
-  const second = launch([path.relative(launcherDir, source), '--port', String(port), '--no-open']);
+  const second = launch([path.relative(launcherDir, source), '--port', String(port), '--no-open'], { keepInput: true });
   await until(() => /Presentation: (http:\/\/\S+)/.test(second.output) || second.child.exitCode !== null || second.error, 'fixed-port positional launch');
   assert.ifError(second.error);
   assert.match(second.output, new RegExp(`Presentation: http://127\\.0\\.0\\.1:${port}/`));
   assert.deepEqual(Buffer.from(await (await fetch(address)).arrayBuffer()), html, 'relative positional path and reused fixed port');
   await stop(second);
+  const executable = await fakeBrowser();
+  const browserRun = launch([source, '--browser', executable], { keepInput: true });
+  const profile = await waitForBrowser(browserRun);
+  const browserUrl = browserRun.output.match(/Presentation: (http:\/\/\S+)/)[1];
+  const preferencesFile = path.join(profile, 'Default', 'Preferences');
+  const preferences = JSON.parse(await fs.readFile(preferencesFile, 'utf8'));
+  const exceptions = preferences.profile.content_settings.exceptions;
+  const exactOrigin = `${new URL(browserUrl).origin},*`;
+  for (const setting of ['automatic_fullscreen', 'popups']) assert.deepEqual(exceptions[setting], { [exactOrigin]: { setting: 1 } });
+  assert.equal(exceptions.window_management, undefined, 'screen consent must remain a normal browser prompt');
+  const browserArgs = (await fs.readFile(path.join(profile, 'fake-arguments.txt'), 'utf8')).replace(/^\uFEFF/, '').trim().split(/\r?\n/);
+  assert.ok(browserArgs.includes(`--user-data-dir=${profile}`), browserArgs.join('\n'));
+  assert.ok(browserArgs.includes(`--app=${browserUrl}`), browserArgs.join('\n'));
+  assert.ok(!browserArgs.some(arg => /disable-web-security|kiosk|start-fullscreen/.test(arg)));
+  const overlapping = launch([source, '--browser', executable], { keepInput: true });
+  const temporaryProfile = await waitForBrowser(overlapping);
+  assert.notEqual(temporaryProfile, profile, 'concurrent launch must not edit a running profile');
+  assert.equal((await stop(overlapping)).code, 0);
+  await assert.rejects(fs.access(temporaryProfile), 'temporary concurrent profile is removed on exit');
+  assert.equal((await fetch(browserUrl)).status, 200, 'closing one owned browser must not close another session');
+  assert.equal((await stop(browserRun)).code, 0, 'Q closes only the owned browser and server');
+  await fs.access(preferencesFile); // Normal dedicated profile persists for later consent.
   assert.deepEqual(await fs.readdir(launcherDir), ['present.cmd'], 'no helper files created beside the standalone launcher');
-  console.log(`PASS: ${powershell ? 'embedded PowerShell payload' : 'standalone Windows CMD with system-only PATH'}; Unicode/special paths, CLI validation, loopback HTTP, GET/HEAD/query, selected-file isolation, idle sockets, header limits, snapshot and process-exit port cleanup.`);
+  console.log(`PASS: ${powershell ? 'embedded PowerShell payload' : 'standalone Windows CMD with system-only PATH'}; default/explicit HTML selection, special paths, loopback HTTP, host/path isolation, scoped browser preferences, concurrent profile isolation and Q browser/server cleanup.`);
 } finally {
   for (const socket of sockets) socket.destroy();
   for (const run of children) await stop(run);

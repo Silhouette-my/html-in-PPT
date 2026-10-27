@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {launchBrowser} from './browser.mjs';
+import fs from 'node:fs/promises';
+import {serveHtml} from './local_server.mjs';
 const browser=await launchBrowser(chromium);
 try {
   const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
@@ -88,6 +90,37 @@ try {
   assert.equal(await page.locator('#deck .slide.active [data-step="2"]').evaluate(el=>getComputedStyle(el).visibility),'hidden');
   await page.evaluate(()=>htmlDeck.prepareExport({index:1}));
   assert.equal(await page.locator('#deck .slide.active [data-step="3"]').evaluate(el=>getComputedStyle(el).visibility),'visible');
+  // The independent HTML recognizes the CMD entry marker. Exercise real popup
+  // rendering while mocking only unavailable physical displays/fullscreen.
+  const local=await serveHtml(await fs.readFile(new URL('../assets/deck-template.html',import.meta.url)),'deck-template.html');
+  const context=await browser.newContext();
+  try {
+    await context.addInitScript(()=>{
+      const origin={left:0,top:0,width:1920,height:1080,availLeft:0,availTop:0,availWidth:1920,availHeight:1040,label:'Presenter'};
+      const audience={...origin,left:1920,availLeft:1920,label:'Audience'};
+      window.screenRequests=0;window.fullscreenTargets=[];
+      window.getScreenDetails=async()=>{window.screenRequests++;return {screens:[origin,audience],currentScreen:origin,addEventListener(){},removeEventListener(){}};};
+      Element.prototype.requestFullscreen=function(options){window.fullscreenTargets.push(options?.screen?.label||'default');return Promise.resolve();};
+    });
+    const localPage=await context.newPage();
+    await localPage.goto(local.url+'?local-present=1');
+    await localPage.evaluate(()=>htmlDeck.ready);
+    assert.equal(await localPage.evaluate(()=>window.screenRequests),0,'opening the default HTML must not prompt for screen permission');
+    const localPopup=context.waitForEvent('page');await localPage.locator('#present').click();const localAudience=await localPopup;
+    await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='presenting');
+    assert.equal(await localPage.evaluate(()=>window.screenRequests),1);
+    assert.deepEqual(await localAudience.evaluate(()=>window.fullscreenTargets),['Audience']);
+    assert.equal(await localPage.locator('#controller').isVisible(),true);
+    assert.equal(await localAudience.locator('#controller,.speaker-note').count(),0);
+    await localPage.locator('#controller-end').click();
+    await localPage.waitForFunction(()=>!document.body.classList.contains('controller-mode'));
+    await localPage.reload();
+    await localPage.evaluate(()=>{window.getScreenDetails=async()=>{throw new DOMException('denied','NotAllowedError');};});
+    const deniedPopup=context.waitForEvent('page');await localPage.locator('#present').click();await deniedPopup;
+    await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='manual');
+    assert.equal(await localPage.locator('#dual-screen-dialog').isVisible(),true,'permission denial retains the manual path');
+    assert.equal(await localPage.locator('#controller').isVisible(),true,'permission denial retains the presenter');
+  } finally {await context.close();await local.close();}
   await page.evaluate(async()=>{window.exportHook=false;htmlDeck.registerEffect({id:'test',index:0,getState:()=>({}),restoreState:()=>{},prepareExport:async()=>{await new Promise(resolve=>setTimeout(resolve,25));window.exportHook=true;}});await htmlDeck.prepareExport({index:0});});
   assert.equal(await page.evaluate(()=>window.exportHook),true);assert.deepEqual(errors,[]);
   console.log('PASS: file:// presenter/audience, notes, steps, SVG/forms/canvas/3D, ink/laser, reopen state, print relocation and async export API.');

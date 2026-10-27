@@ -371,7 +371,8 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     selectTab(tabs[n].id.slice(4)); tabs[n].focus();
   });
   function on(id, handler) { $(id).addEventListener('click', handler); }
-  ['present', 'from-current', 'status-present'].forEach(id => on(id, () => start()));
+  on('present',()=>isLocalPresenterLocation(window.location)?openPresenterFromGesture():start());
+  ['from-current', 'status-present'].forEach(id => on(id, () => start()));
   on('from-start', () => { go(0); start(); }); on('exit', stop);
   on('prev', () => advance('previous')); on('next', () => advance('next'));
   ['overview-open', 'sorter-view', 'status-overview', 'show-overview'].forEach(id => on(id, () => openDialog('overview')));
@@ -408,6 +409,26 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   // DUAL_SCREEN_START — dependency-injected browser flow; no permission request at load.
   function sameDisplay(a,b) {
     return !!a && !!b && (a===b || ['left','top','width','height'].every(key=>a[key]===b[key]));
+  }
+  function isLocalPresenterLocation(location) {
+    return location.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('local-present')==='1';
+  }
+  function createLocalPresenterLauncher(env) {
+    let busy=false;
+    return async function launchLocalPresenter() {
+      if(busy)return false;
+      // Open while the user's click still has popup activation. Screen access
+      // remains a browser prompt; the CMD profile allows the later fullscreen.
+      if(!env.openPresenter())return false;
+      busy=true;
+      try {
+        let state=await env.session.discover();
+        if(!env.isActive())return false;
+        if(state.phase==='ready')state=await env.session.launch();
+        if(env.isActive()&&state.phase!=='presenting')env.showSetup();
+        return state.phase==='presenting';
+      } finally {busy=false;}
+    };
   }
   function screenFailure(error) {
     if(error.name==='NotAllowedError')return '屏幕访问未获允许。可在浏览器站点权限中允许窗口管理，或使用手动双屏。';
@@ -660,7 +681,7 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     catch{toast('浏览器未允许跨窗口全屏。请点击观众画面重试；也可使用其 F 键或浏览器全屏。');return false;}
   }
   on('ribbon-switch', () => { const collapsed = document.body.classList.toggle('ribbon-collapsed'); $('ribbon-switch').setAttribute('aria-expanded', String(!collapsed)); $('ribbon-switch').setAttribute('aria-label', collapsed ? '展开功能区' : '折叠功能区'); fit(); });
-  on('presenter', openPresenter);
+  on('presenter', openPresenterFromGesture);
   window.addEventListener('pagehide', () => { if (audienceWindow && !audienceWindow.closed) audienceWindow.close(); });
   setInterval(updateTimer, 500);
   new ResizeObserver(fit).observe($('stage')); window.addEventListener('resize', fit); window.addEventListener('hashchange', fromHash);
@@ -716,14 +737,14 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   [50,75,100,125,150].forEach(v => on('zoom-'+v, () => { setZoom(v/100); $('zoom-dialog').close(); }));
   on('zoom-fit-dialog', () => { fitWindow(); $('zoom-dialog').close(); });
   on('menu-from-start', () => { go(0); start(); }); on('menu-from-current', () => start());
-  ['menu-presenter','show-presenter'].forEach(id => on(id, () => { closeMenus(); openPresenter(); }));
+  ['menu-presenter','show-presenter'].forEach(id => on(id, () => { closeMenus(); openPresenterFromGesture(); }));
   on('show-pen', e => { const open = $('show-tools').hidden; closeMenus(); $('show-tools').hidden = !open; $('show-more').setAttribute('aria-expanded',String(open)); });
   on('show-blank', () => toggleBlank('black'));
   on('draw-present', () => { start(false); setTool('pen'); });
   const toolLabels = {'tool-laser':'激光笔 L','tool-pen':'画笔 P','tool-erase':'清除本页墨迹 E','show-black':'黑屏 B','show-help':'键盘快捷键','exit':'结束放映 Esc'};
   Object.entries(toolLabels).forEach(([id,label]) => $(id).querySelector('span').textContent = label);
   const commands = [
-    ['从头开始放映', () => {go(0);start();}], ['从当前幻灯片开始', () => start()], ['演示者视图',openPresenter],
+    ['从头开始放映', () => {go(0);start();}], ['从当前幻灯片开始', () => start()], ['演示者视图',openPresenterFromGesture],
     ['查看所有幻灯片', () => openDialog('overview')], ['备注',toggleNotes], ['适应窗口大小',fitWindow], ['缩放至 100%', () => setZoom(1)],
     ['打印 / PDF', () => window.print()], ['下载 HTML 副本',downloadHTML], ['键盘快捷键', () => openDialog('help')],
     ['重置计时',resetTimer], ['开始 / 暂停计时',toggleTimer], ['重命名', () => $('rename').click()]
@@ -859,6 +880,12 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     }
   });
   function showDualSetup(){closeMenus();hideSearch();$('dual-screen-status').textContent=dualScreenSession.getState().message;$('dual-screen-dialog').showModal();}
+  const launchLocalPresenter=createLocalPresenterLauncher({session:dualScreenSession,openPresenter:()=>openPresenter({focus:false}),isActive:()=>controllerMode,showSetup:showDualSetup});
+  function openPresenterFromGesture(){
+    closeMenus();hideSearch();
+    if(isLocalPresenterLocation(window.location))return launchLocalPresenter();
+    return openPresenter();
+  }
   ['dual-screen-open','show-dual-screen'].forEach(id=>on(id,showDualSetup));
   on('dual-detect',()=>dualScreenSession.discover());
   $('dual-screen-dialog').addEventListener('close',()=>dualScreenSession.cancelDetection());

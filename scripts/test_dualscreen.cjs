@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'../assets/deck-template.html'),'utf8');
 const source=html.split('// DUAL_SCREEN_START')[1].split('// DUAL_SCREEN_END')[0].split('\n').slice(1).join('\n');
-const context=vm.createContext({});vm.runInContext(source,context);
+const context=vm.createContext({URLSearchParams});vm.runInContext(source,context);
 const screen=(left,label)=>({left,top:0,width:1920,height:1080,availLeft:left,availTop:0,availWidth:1920,availHeight:1040,label});
 function fixture(overrides={}){
  const origin=screen(0,'讲稿屏'),audience=screen(1920,'投影屏');
@@ -39,6 +39,18 @@ function fixture(overrides={}){
  f=fixture();let finish;f.env.requestFullscreen=()=>new Promise(resolve=>finish=resolve);await f.session.discover();const launch=f.session.launch();assert.equal(f.session.getState().phase,'starting');f.details.screens=[f.origin];f.emit();finish();await launch;assert.equal(f.session.getState().phase,'manual');assert.ok(f.calls.includes('cancelFullscreen'),'late fullscreen success must not revive a disconnected session');
  f=fixture();let allow;f.env.getScreens=()=>new Promise(resolve=>allow=resolve);const discovery=f.session.discover();f.session.dispose();allow(f.details);await discovery;assert.equal(f.listeners.size,0);assert.equal(f.popupCount,0,'cancelled permission discovery cannot orphan a popup');
  f=fixture();let firstPermission;f.env.getScreens=()=>new Promise(resolve=>firstPermission=resolve);const firstDiscovery=f.session.discover();assert.equal(f.session.getState().phase,'loading');f.session.cancelDetection();assert.equal(f.session.getState().phase,'idle');f.env.getScreens=async()=>f.details;await f.session.discover();assert.equal(f.session.getState().phase,'ready');firstPermission(f.details);await firstDiscovery;assert.equal(f.session.getState().phase,'ready','late cancelled permission cannot overwrite the reopened session');assert.equal(f.popupCount,0);
+ // The CMD marker starts automatic placement only on a loopback HTTP page and
+ // only after a presenter gesture; no permissions or windows are opened at load.
+ for(const [address,expected] of [['http://127.0.0.1:8768/deck.html?local-present=1',true],['http://localhost:8768/?local-present=1',true],['https://example.com/?local-present=1',false],['file:///deck.html?local-present=1',false],['http://127.0.0.1:8768/deck.html',false]])assert.equal(context.isLocalPresenterLocation(new URL(address)),expected);
+ for(const ready of ['presenting','manual','retry']){
+  const calls=[];const launch=context.createLocalPresenterLauncher({openPresenter:()=>{calls.push('popup');return true;},isActive:()=>true,showSetup:()=>calls.push('setup'),session:{discover:async()=>{calls.push('permission');return {phase:ready==='manual'?'manual':'ready'};},launch:async()=>{calls.push('fullscreen');return {phase:ready};}}});
+  assert.deepEqual(calls,[]);const pending=launch();assert.deepEqual(calls,['popup','permission']);await pending;
+  assert.deepEqual(calls,ready==='manual'?['popup','permission','setup']:ready==='retry'?['popup','permission','fullscreen','setup']:['popup','permission','fullscreen']);
+ }
+ let permissionDone,active=true;const localCalls=[];
+ const local=context.createLocalPresenterLauncher({openPresenter:()=>{localCalls.push('popup');return true;},isActive:()=>active,showSetup:()=>localCalls.push('setup'),session:{discover:()=>new Promise(resolve=>permissionDone=resolve),launch:()=>{localCalls.push('fullscreen');return {phase:'presenting'};}}});
+ const localPending=local();assert.equal(await local(),false,'ignore repeated clicks while permission is pending');active=false;permissionDone({phase:'ready'});await localPending;assert.deepEqual(localCalls,['popup'],'ending the presenter while permission is pending must not fullscreen a closed audience');
+ let blockedPermission=false;const blockedLocal=context.createLocalPresenterLauncher({openPresenter:()=>false,session:{discover:()=>{blockedPermission=true;}}});await blockedLocal();assert.equal(blockedPermission,false);
  assert.match(html,/requestFullscreen\(\{screen\}\)/);assert.match(html,/id="present" title="从当前幻灯片开始放映"/);
  assert.equal((html.match(/data-interaction-hint/g)||[]).length,3);
  // Digit confirmation/expiry share cleanup of both the buffer and its prompt.
