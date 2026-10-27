@@ -46,7 +46,8 @@ If the default is missing, a file picker opens. Drag/drop overrides the default.
 Only the selected, self-contained HTML is served on 127.0.0.1.
 No Node.js, npm, Python, installation or network download is required.
 Edge / Chrome opens with a dedicated profile for local popup/fullscreen settings.
-The initial window opens on the launcher's screen, centered at a 16:9 size.
+The terminal and initial browser window open on the launcher's screen.
+The browser window is centered at a 16:9 size; the terminal keeps its size if it fits.
 Click Presenter in the HTML and allow screen management for automatic dual screen.
 Keep this window open. Press Q, Esc or Ctrl+C to close the browser and server.
 '@
@@ -96,6 +97,7 @@ function Initialize-PresentationWindow {
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class PresentLaunchWindow {
     [StructLayout(LayoutKind.Sequential)] struct Point { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] struct Rect { public int Left, Top, Right, Bottom; }
@@ -104,6 +106,8 @@ public static class PresentLaunchWindow {
     [DllImport("user32.dll")] static extern bool EnumWindows(WindowCallback callback, IntPtr data);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
+    [DllImport("kernel32.dll")] static extern IntPtr GetConsoleWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll")] static extern bool GetCursorPos(out Point point);
     [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(Point point, uint flags);
     [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
@@ -130,6 +134,44 @@ public static class PresentLaunchWindow {
         int width = unit * 16, height = unit * 9;
         return new[] { work[0] + (work[2] - width) / 2, work[1] + (work[3] - height) / 2, width, height };
     }
+    public static int[] LaunchWorkArea;
+    public static int[] FitConsole(int[] work, int width, int height) {
+        if (work == null || work.Length != 4 || work[2] <= 0 || work[3] <= 0 || width <= 0 || height <= 0) return null;
+        width = Math.Min(width, work[2]);
+        height = Math.Min(height, work[3]);
+        return new[] { work[0] + (work[2] - width) / 2, work[1] + (work[3] - height) / 2, width, height };
+    }
+    static bool IsConsoleHost(IntPtr window) {
+        if (window == IntPtr.Zero || !IsWindowVisible(window)) return false;
+        var name = new StringBuilder(128);
+        GetClassName(window, name, name.Capacity);
+        return name.ToString() == "ConsoleWindowClass" || name.ToString() == "CASCADIA_HOSTING_WINDOW_CLASS";
+    }
+    public static int[] PlaceConsole(int[] work) {
+        IntPtr old = EnterDpi();
+        try {
+            IntPtr console = GetConsoleWindow();
+            if (console == IntPtr.Zero) return null;
+            // ConPTY returns a hidden message window. Its root owner is the
+            // visible Windows Terminal host, including when it has many tabs.
+            IntPtr window = GetAncestor(console, 3);
+            if (!IsConsoleHost(window)) window = IsConsoleHost(console) ? console : IntPtr.Zero;
+            if (window == IntPtr.Zero) return null;
+            bool maximized = IsZoomed(window);
+            Rect r;
+            try {
+                if (maximized) ShowWindow(window, 9);
+                if (!GetWindowRect(window, out r)) return null;
+                int[] bounds = FitConsole(work, r.Right - r.Left, r.Bottom - r.Top);
+                if (bounds == null) return null;
+                if (!SetWindowPos(window, IntPtr.Zero, bounds[0], bounds[1], bounds[2], bounds[3], 0x14)) return null;
+                if (!GetWindowRect(window, out r)) return null;
+                if (r.Left < work[0] || r.Top < work[1] || r.Right > work[0] + work[2] || r.Bottom > work[1] + work[3]) return null;
+            } finally { if (maximized) ShowWindow(window, 3); }
+            if (maximized && !GetWindowRect(window, out r)) return null;
+            return new[] { r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top };
+        } finally { LeaveDpi(old); }
+    }
     public static int[] Capture(long[] candidates) {
         IntPtr old = EnterDpi();
         try {
@@ -146,7 +188,8 @@ public static class PresentLaunchWindow {
             var info = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
             if (!GetMonitorInfo(monitor, ref info)) return null;
             Rect r = info.Work;
-            return Fit16By9(new[] { r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top });
+            LaunchWorkArea = new[] { r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top };
+            return Fit16By9(LaunchWorkArea);
         } finally { LeaveDpi(old); }
     }
     public static bool IsOwnedWindow(long handle, uint owner) {
@@ -180,7 +223,24 @@ public static class PresentLaunchWindow {
 '@
 }
 $launchBounds = $null
-if (-not $noOpen -and [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+$terminalPlacement = @{ WorkArea = $null; Until = $null; Done = $false }
+function Update-TerminalWindow {
+    if ($terminalPlacement.Done -or -not $terminalPlacement.Until) { return }
+    if ([DateTime]::UtcNow -gt $terminalPlacement.Until) { $terminalPlacement.Until = $null; return }
+    try {
+        $rect = [PresentLaunchWindow]::PlaceConsole([int[]]$terminalPlacement.WorkArea)
+        if ($rect) {
+            $terminalPlacement.Done = $true
+            $terminalPlacement.Until = $null
+            Write-Host ('Terminal placement: {0},{1} {2}x{3}' -f $rect[0], $rect[1], $rect[2], $rect[3])
+        }
+    } catch {
+        $terminalPlacement.Until = $null
+        Write-Warning "Could not position the terminal window. $($_.Exception.Message)"
+    }
+}
+$positionTerminal = -not [Console]::IsInputRedirected
+if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and (-not $noOpen -or $positionTerminal)) {
     $sourceWindows = @()
     $shell = $null
     try {
@@ -198,6 +258,11 @@ if (-not $noOpen -and [Environment]::OSVersion.Platform -eq [PlatformID]::Win32N
     try {
         Initialize-PresentationWindow
         $launchBounds = [PresentLaunchWindow]::Capture([long[]]$sourceWindows)
+        if ($positionTerminal -and [PresentLaunchWindow]::LaunchWorkArea) {
+            $terminalPlacement.WorkArea = [PresentLaunchWindow]::LaunchWorkArea
+            $terminalPlacement.Until = [DateTime]::UtcNow.AddSeconds(3)
+            Update-TerminalWindow
+        }
     } catch { Write-Warning "Could not determine the launch screen. $($_.Exception.Message)" }
 }
 if ($null -eq $htmlPath) {
@@ -410,6 +475,12 @@ $oldControlC = $null
 $stdinStream = $null
 $stdinTask = $null
 try {
+    # The terminal host may become visible while a file picker is open. Retry
+    # startup placement before opening the browser, then stop after success.
+    if ($terminalPlacement.WorkArea -and -not $terminalPlacement.Done) {
+        $terminalPlacement.Until = [DateTime]::UtcNow.AddSeconds(3)
+        Update-TerminalWindow
+    }
     # A stable origin preserves screen permission. Default ports 8768..8778
     # are tried in order; an explicitly requested occupied port is an error.
     $lastPort = if ($portSet) { $port } else { $port + 10 }
@@ -449,6 +520,7 @@ try {
             else { $stdinTask = $stdinStream.ReadAsync($stdinByte, 0, 1) }
         }
         if ($browserState.Process -and $browserState.Process.HasExited) { break }
+        Update-TerminalWindow
         Update-PresentationWindow
         # Browsers may preconnect without sending a request. Keep those sockets
         # separate so an idle connection cannot block the actual presentation.
