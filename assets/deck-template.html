@@ -371,7 +371,8 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     selectTab(tabs[n].id.slice(4)); tabs[n].focus();
   });
   function on(id, handler) { $(id).addEventListener('click', handler); }
-  ['present', 'from-current', 'status-present'].forEach(id => on(id, () => start()));
+  on('present',()=>isLocalPresenterLocation(window.location)?openPresenterFromGesture():start());
+  ['from-current', 'status-present'].forEach(id => on(id, () => start()));
   on('from-start', () => { go(0); start(); }); on('exit', stop);
   on('prev', () => advance('previous')); on('next', () => advance('next'));
   ['overview-open', 'sorter-view', 'status-overview', 'show-overview'].forEach(id => on(id, () => openDialog('overview')));
@@ -408,6 +409,52 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   // DUAL_SCREEN_START — dependency-injected browser flow; no permission request at load.
   function sameDisplay(a,b) {
     return !!a && !!b && (a===b || ['left','top','width','height'].every(key=>a[key]===b[key]));
+  }
+  function presentationWindowBounds(screen,presenter={}) {
+    const availWidth=screen?.availWidth||1280,availHeight=screen?.availHeight||720;
+    const preferredWidth=presenter.outerWidth||presenter.innerWidth||1280;
+    const width=Math.max(1,Math.floor(Math.min(preferredWidth,availWidth,availHeight*16/9)));
+    const height=Math.max(1,Math.min(availHeight,Math.round(width*9/16)));
+    return {left:Math.round((screen?.availLeft??screen?.left??0)+(availWidth-width)/2),top:Math.round((screen?.availTop??screen?.top??0)+(availHeight-height)/2),width,height};
+  }
+  function presentationPopupSize(bounds,presenter={}) {
+    // window.open sizes the viewport; resizeTo sizes the complete window.
+    const frameWidth=presenter.outerWidth>0&&presenter.innerWidth>0?Math.max(0,presenter.outerWidth-presenter.innerWidth):0;
+    const frameHeight=presenter.outerHeight>0&&presenter.innerHeight>0?Math.max(0,presenter.outerHeight-presenter.innerHeight):0;
+    return {width:Math.max(1,Math.floor(bounds.width-frameWidth)),height:Math.max(1,Math.floor(bounds.height-frameHeight))};
+  }
+  function placeAudienceWindow(win,bounds,fullscreenPending=false) {
+    if(!win||win.closed||fullscreenPending)return false;
+    try {
+      if(win.document.fullscreenElement)return false;
+      if(win.outerWidth!==bounds.width||win.outerHeight!==bounds.height)win.resizeTo(bounds.width,bounds.height);
+      if(win.screenX!==bounds.left||win.screenY!==bounds.top)win.moveTo(bounds.left,bounds.top);
+      return true;
+    } catch {return false;}
+  }
+  function isLocalPresenterLocation(location) {
+    return location.protocol==='http:' && ['127.0.0.1','localhost','[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('local-present')==='1';
+  }
+  function createLocalPresenterLauncher(env) {
+    let busy=false;
+    return async function launchLocalPresenter() {
+      if(busy)return false;
+      busy=true;
+      try {
+        // Keep the permission prompt in the presenter window. Only create the
+        // audience after consent, on its target screen; the CMD profile allows
+        // popup/fullscreen requests after the asynchronous permission response.
+        env.enterPresenter();
+        let state=await env.session.discover();
+        if(!env.isActive())return false;
+        if(state.phase==='ready'){
+          if(!env.openAudience(state.screens[state.selected])){env.showSetup();return false;}
+          state=await env.session.launch();
+        }
+        if(env.isActive()&&state.phase!=='presenting')env.showSetup();
+        return state.phase==='presenting';
+      } finally {busy=false;}
+    };
   }
   function screenFailure(error) {
     if(error.name==='NotAllowedError')return '屏幕访问未获允许。可在浏览器站点权限中允许窗口管理，或使用手动双屏。';
@@ -612,9 +659,9 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   window.addEventListener('beforeprint',()=>{if(controllerMode){$('main').prepend($('stage'));document.body.classList.remove('controller-mode');$('controller').hidden=true;}});
   window.addEventListener('afterprint',()=>{if(controllerMode){$('controller-current').append($('stage'));document.body.classList.add('controller-mode');$('controller').hidden=false;fit();updatePresenter();}});
   function openPresenter(options={}){
-    if(audienceWindow&&!audienceWindow.closed){enterController();if(options.focus!==false)audienceWindow.focus();syncAudience();return true;}
-    const screen=options.screen,placement=screen?`,left=${screen.availLeft+24},top=${screen.availTop+24},width=${Math.min(1280,screen.availWidth-48)},height=${Math.min(800,screen.availHeight-48)}`:',width=1280,height=720';
-    const win=window.open('','html-deck-audience','popup=yes'+placement);
+    if(audienceWindow&&!audienceWindow.closed){enterController();fitAudienceWindow(options.screen);if(options.focus!==false)audienceWindow.focus();syncAudience();return true;}
+    const bounds=presentationWindowBounds(options.screen||window.screen,window),size=presentationPopupSize(bounds,window),placement=`,left=${bounds.left},top=${bounds.top},width=${size.width},height=${size.height}`;
+    const win=window.open('','html-deck-audience','popup=yes,resizable=yes'+placement);
     if(!win){toast('观众弹窗被阻止，请允许本页弹窗后重试。');return false;}
     audienceWindow=win;audienceIndex=-1;
     const doc=win.document;doc.open();doc.write('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>观众画面 · PowerPoint</title><style>'+document.querySelector('style').textContent+'\nhtml,body{margin:0;height:100%;overflow:hidden;background:#111}body{display:grid;place-items:center}#audience-stage{position:relative;overflow:hidden}#audience-surface{position:relative;width:1600px;height:900px;transform-origin:top left}#audience-slide>.slide{display:block;box-shadow:none}#audience-ink{position:absolute;inset:0;width:1600px;height:900px;pointer-events:none;z-index:5}#audience-laser{position:absolute;width:16px;height:16px;border-radius:50%;background:#f22;box-shadow:0 0 8px 3px #ff202090;transform:translate(-50%,-50%);z-index:6;pointer-events:none}#audience-blank{position:fixed;inset:0;z-index:20}body .step-hidden{visibility:hidden!important;opacity:0!important;pointer-events:none!important}</style></head><body><main id="audience-stage"><div id="audience-surface"><div id="audience-slide"></div><canvas id="audience-ink" width="1600" height="900"></canvas><div id="audience-laser" hidden></div></div></main><div id="audience-blank" hidden></div></body></html>');doc.close();
@@ -650,7 +697,15 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     });
     win.addEventListener('resize',fitAudience);doc.addEventListener('visibilitychange',()=>{syncEffects();});
     win.addEventListener('pagehide',()=>{if(audienceWindow===win){audienceIndex=-1;queueMicrotask(()=>{updatePresenter();syncEffects();});}});
-    enterController();syncAudience(true);syncEffects();if(options.focus!==false)window.focus();return true;
+    enterController();fitAudienceWindow(options.screen);syncAudience(true);syncEffects();
+    // Browser decorations can settle after opening. Never resize or move a
+    // popup once its cross-screen fullscreen request has started.
+    requestAnimationFrame(()=>{if(audienceWindow===win)fitAudienceWindow(options.screen);});
+    if(options.focus!==false)window.focus();return true;
+  }
+  function fitAudienceWindow(screen){
+    if(!audienceWindow||audienceWindow.closed||audienceFullscreenTarget)return;
+    placeAudienceWindow(audienceWindow,presentationWindowBounds(screen||audienceWindow.screen||window.screen,window));
   }
   function audiencePoint(event){const rect=audienceWindow.document.getElementById('audience-stage').getBoundingClientRect();return {x:(event.clientX-rect.left)*1600/rect.width,y:(event.clientY-rect.top)*900/rect.height};}
   async function requestAudienceFullscreen(screen=null){
@@ -660,10 +715,11 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     catch{toast('浏览器未允许跨窗口全屏。请点击观众画面重试；也可使用其 F 键或浏览器全屏。');return false;}
   }
   on('ribbon-switch', () => { const collapsed = document.body.classList.toggle('ribbon-collapsed'); $('ribbon-switch').setAttribute('aria-expanded', String(!collapsed)); $('ribbon-switch').setAttribute('aria-label', collapsed ? '展开功能区' : '折叠功能区'); fit(); });
-  on('presenter', openPresenter);
+  on('presenter', openPresenterFromGesture);
   window.addEventListener('pagehide', () => { if (audienceWindow && !audienceWindow.closed) audienceWindow.close(); });
   setInterval(updateTimer, 500);
   new ResizeObserver(fit).observe($('stage')); window.addEventListener('resize', fit); window.addEventListener('hashchange', fromHash);
+  window.addEventListener('resize',()=>fitAudienceWindow());
 
   const menuIds = ['file-menu','present-menu','edit-menu','more-menu','show-tools'];
   function closeMenus() {
@@ -716,14 +772,14 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
   [50,75,100,125,150].forEach(v => on('zoom-'+v, () => { setZoom(v/100); $('zoom-dialog').close(); }));
   on('zoom-fit-dialog', () => { fitWindow(); $('zoom-dialog').close(); });
   on('menu-from-start', () => { go(0); start(); }); on('menu-from-current', () => start());
-  ['menu-presenter','show-presenter'].forEach(id => on(id, () => { closeMenus(); openPresenter(); }));
+  ['menu-presenter','show-presenter'].forEach(id => on(id, () => { closeMenus(); openPresenterFromGesture(); }));
   on('show-pen', e => { const open = $('show-tools').hidden; closeMenus(); $('show-tools').hidden = !open; $('show-more').setAttribute('aria-expanded',String(open)); });
   on('show-blank', () => toggleBlank('black'));
   on('draw-present', () => { start(false); setTool('pen'); });
   const toolLabels = {'tool-laser':'激光笔 L','tool-pen':'画笔 P','tool-erase':'清除本页墨迹 E','show-black':'黑屏 B','show-help':'键盘快捷键','exit':'结束放映 Esc'};
   Object.entries(toolLabels).forEach(([id,label]) => $(id).querySelector('span').textContent = label);
   const commands = [
-    ['从头开始放映', () => {go(0);start();}], ['从当前幻灯片开始', () => start()], ['演示者视图',openPresenter],
+    ['从头开始放映', () => {go(0);start();}], ['从当前幻灯片开始', () => start()], ['演示者视图',openPresenterFromGesture],
     ['查看所有幻灯片', () => openDialog('overview')], ['备注',toggleNotes], ['适应窗口大小',fitWindow], ['缩放至 100%', () => setZoom(1)],
     ['打印 / PDF', () => window.print()], ['下载 HTML 副本',downloadHTML], ['键盘快捷键', () => openDialog('help')],
     ['重置计时',resetTimer], ['开始 / 暂停计时',toggleTimer], ['重命名', () => $('rename').click()]
@@ -859,6 +915,12 @@ body.export-slide #controller{display:none!important}body.export-slide.export-st
     }
   });
   function showDualSetup(){closeMenus();hideSearch();$('dual-screen-status').textContent=dualScreenSession.getState().message;$('dual-screen-dialog').showModal();}
+  const launchLocalPresenter=createLocalPresenterLauncher({session:dualScreenSession,enterPresenter:enterController,openAudience:screen=>openPresenter({screen,focus:false}),isActive:()=>controllerMode,showSetup:showDualSetup});
+  function openPresenterFromGesture(){
+    closeMenus();hideSearch();
+    if(isLocalPresenterLocation(window.location))return launchLocalPresenter();
+    return openPresenter();
+  }
   ['dual-screen-open','show-dual-screen'].forEach(id=>on(id,showDualSetup));
   on('dual-detect',()=>dualScreenSession.discover());
   $('dual-screen-dialog').addEventListener('close',()=>dualScreenSession.cancelDetection());

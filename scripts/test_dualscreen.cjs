@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'../assets/deck-template.html'),'utf8');
 const source=html.split('// DUAL_SCREEN_START')[1].split('// DUAL_SCREEN_END')[0].split('\n').slice(1).join('\n');
-const context=vm.createContext({});vm.runInContext(source,context);
+const context=vm.createContext({URLSearchParams});vm.runInContext(source,context);
 const screen=(left,label)=>({left,top:0,width:1920,height:1080,availLeft:left,availTop:0,availWidth:1920,availHeight:1040,label});
 function fixture(overrides={}){
  const origin=screen(0,'讲稿屏'),audience=screen(1920,'投影屏');
@@ -39,11 +39,45 @@ function fixture(overrides={}){
  f=fixture();let finish;f.env.requestFullscreen=()=>new Promise(resolve=>finish=resolve);await f.session.discover();const launch=f.session.launch();assert.equal(f.session.getState().phase,'starting');f.details.screens=[f.origin];f.emit();finish();await launch;assert.equal(f.session.getState().phase,'manual');assert.ok(f.calls.includes('cancelFullscreen'),'late fullscreen success must not revive a disconnected session');
  f=fixture();let allow;f.env.getScreens=()=>new Promise(resolve=>allow=resolve);const discovery=f.session.discover();f.session.dispose();allow(f.details);await discovery;assert.equal(f.listeners.size,0);assert.equal(f.popupCount,0,'cancelled permission discovery cannot orphan a popup');
  f=fixture();let firstPermission;f.env.getScreens=()=>new Promise(resolve=>firstPermission=resolve);const firstDiscovery=f.session.discover();assert.equal(f.session.getState().phase,'loading');f.session.cancelDetection();assert.equal(f.session.getState().phase,'idle');f.env.getScreens=async()=>f.details;await f.session.discover();assert.equal(f.session.getState().phase,'ready');firstPermission(f.details);await firstDiscovery;assert.equal(f.session.getState().phase,'ready','late cancelled permission cannot overwrite the reopened session');assert.equal(f.popupCount,0);
+ for(const screen of [{availLeft:1920,availTop:40,availWidth:2560,availHeight:1400},{availLeft:-1920,availTop:-120,availWidth:1920,availHeight:1040},{availLeft:0,availTop:0,availWidth:1080,availHeight:1880},{availLeft:0,availTop:0,availWidth:800,availHeight:560}]){
+  const bounds=context.presentationWindowBounds(screen,{outerWidth:960});
+  assert.ok(Math.abs(bounds.width*9-bounds.height*16)<=8,'audience outer window stays at 16:9 within pixel rounding');
+  if(screen.availWidth>=960&&screen.availHeight>=540)assert.equal(bounds.width,960,'match presenter outer width when the target screen can fit it');
+  assert.ok(bounds.left>=screen.availLeft&&bounds.top>=screen.availTop&&bounds.left+bounds.width<=screen.availLeft+screen.availWidth&&bounds.top+bounds.height<=screen.availTop+screen.availHeight);
+  assert.ok(Math.abs(bounds.left-screen.availLeft-(screen.availWidth-bounds.width)/2)<=.5);
+  assert.ok(Math.abs(bounds.top-screen.availTop-(screen.availHeight-bounds.height)/2)<=.5);
+ }
+ const work={availLeft:-1536,availTop:32,availWidth:1536,availHeight:832};
+ const presenter={outerWidth:1408,outerHeight:792,innerWidth:1392,innerHeight:754};
+ const matched=context.presentationWindowBounds(work,presenter),viewport=context.presentationPopupSize(matched,presenter);
+ assert.equal(matched.width,presenter.outerWidth);assert.equal(matched.height,792);
+ assert.equal(viewport.width+16,matched.width,'window.open viewport must reserve the resizing borders');
+ assert.equal(viewport.height+38,matched.height,'window.open viewport must reserve browser chrome');
+ const small=context.presentationWindowBounds({availWidth:1024,availHeight:720},presenter);
+ assert.equal(small.width,1024);assert.equal(small.height,576,'shrink to a smaller target screen without changing 16:9');
+ const calls=[];const popup={closed:false,document:{fullscreenElement:null},outerWidth:1600,outerHeight:1000,screenX:900,screenY:0,resizeTo:(w,h)=>calls.push(['resize',w,h]),moveTo:(x,y)=>calls.push(['move',x,y])};
+ assert.equal(context.placeAudienceWindow(popup,matched),true);assert.deepEqual(calls,[['resize',1408,792],['move',matched.left,matched.top]]);
+ calls.length=0;popup.document.fullscreenElement={};assert.equal(context.placeAudienceWindow(popup,matched),false);assert.deepEqual(calls,[]);
+ popup.document.fullscreenElement=null;assert.equal(context.placeAudienceWindow(popup,matched,true),false);assert.deepEqual(calls,[],'pending fullscreen must not be undone by a queued window resize');
+ // The CMD marker starts automatic placement only on a loopback HTTP page and
+ // only after a presenter gesture; no permissions or windows are opened at load.
+ for(const [address,expected] of [['http://127.0.0.1:8768/deck.html?local-present=1',true],['http://localhost:8768/?local-present=1',true],['https://example.com/?local-present=1',false],['file:///deck.html?local-present=1',false],['http://127.0.0.1:8768/deck.html',false]])assert.equal(context.isLocalPresenterLocation(new URL(address)),expected);
+ for(const ready of ['presenting','manual','retry']){
+  const calls=[],target=screen(1920,'投影屏');
+  const launch=context.createLocalPresenterLauncher({enterPresenter:()=>calls.push('presenter'),openAudience:selected=>{assert.equal(selected,target);calls.push('popup');return true;},isActive:()=>true,showSetup:()=>calls.push('setup'),session:{discover:async()=>{calls.push('permission');return {phase:ready==='manual'?'manual':'ready',screens:[screen(0,'讲稿屏'),target],selected:1};},launch:async()=>{calls.push('fullscreen');return {phase:ready};}}});
+  assert.deepEqual(calls,[]);const pending=launch();assert.deepEqual(calls,['presenter','permission'],'request permission in the presenter without opening an audience');await pending;
+  assert.deepEqual(calls,ready==='manual'?['presenter','permission','setup']:ready==='retry'?['presenter','permission','popup','fullscreen','setup']:['presenter','permission','popup','fullscreen']);
+ }
+ let permissionDone,active=true;const localCalls=[];
+ const local=context.createLocalPresenterLauncher({enterPresenter:()=>localCalls.push('presenter'),openAudience:()=>{localCalls.push('popup');return true;},isActive:()=>active,showSetup:()=>localCalls.push('setup'),session:{discover:()=>{localCalls.push('permission');return new Promise(resolve=>permissionDone=resolve);},launch:()=>{localCalls.push('fullscreen');return {phase:'presenting'};}}});
+ const localPending=local();assert.equal(await local(),false,'ignore repeated clicks while permission is pending');active=false;permissionDone({phase:'ready'});await localPending;assert.deepEqual(localCalls,['presenter','permission'],'ending the presenter while permission is pending must not open or fullscreen an audience');
+ const blockedCalls=[];const blockedLocal=context.createLocalPresenterLauncher({enterPresenter:()=>blockedCalls.push('presenter'),openAudience:()=>{blockedCalls.push('blockedPopup');return false;},isActive:()=>true,showSetup:()=>blockedCalls.push('setup'),session:{discover:async()=>{blockedCalls.push('permission');return {phase:'ready',screens:[screen(0,'讲稿屏'),screen(1920,'投影屏')],selected:1};},launch:()=>{throw new Error('must not fullscreen a blocked audience');}}});
+ assert.equal(await blockedLocal(),false);assert.deepEqual(blockedCalls,['presenter','permission','blockedPopup','setup']);
  assert.match(html,/requestFullscreen\(\{screen\}\)/);assert.match(html,/id="present" title="从当前幻灯片开始放映"/);
  assert.equal((html.match(/data-interaction-hint/g)||[]).length,3);
  // Digit confirmation/expiry share cleanup of both the buffer and its prompt.
  assert.match(html,/function resetNumberJump\(\) \{ clearTimeout\(numberTimer\); numberBuffer=''; clearTimeout\(toastTimer\); \$\('toast'\)\.hidden=true;/);
  assert.match(html,/const n = Number\(numberBuffer\); resetNumberJump\(\)/);
  assert.match(html,/setTimeout\(resetNumberJump, 3000\)/);
- console.log('PASS: fullscreen-before-companion-popup ordering, secure/support/denial/single/mirror fallbacks, popup-blocked late-fullscreen cancellation, fullscreen retry, initiating-screen retention, disconnect and cancelled discovery; digit prompt and authored hints.');
+ console.log('PASS: permission-before-audience local launch, target-screen popup, fullscreen ordering, secure/support/denial/single/mirror fallbacks, blocked-popup cancellation, retry, initiating-screen retention, disconnect and cancelled discovery; digit prompt and authored hints.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

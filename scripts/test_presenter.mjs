@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
 import {launchBrowser} from './browser.mjs';
+import fs from 'node:fs/promises';
+import {serveHtml} from './local_server.mjs';
 const browser=await launchBrowser(chromium);
 try {
   const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
@@ -88,6 +90,82 @@ try {
   assert.equal(await page.locator('#deck .slide.active [data-step="2"]').evaluate(el=>getComputedStyle(el).visibility),'hidden');
   await page.evaluate(()=>htmlDeck.prepareExport({index:1}));
   assert.equal(await page.locator('#deck .slide.active [data-step="3"]').evaluate(el=>getComputedStyle(el).visibility),'visible');
+  // The independent HTML recognizes the CMD entry marker. Exercise real popup
+  // rendering with modeled displays, Windows decorations and fullscreen.
+  const local=await serveHtml(await fs.readFile(new URL('../assets/deck-template.html',import.meta.url)),'deck-template.html');
+  const context=await browser.newContext();
+  try {
+    await context.addInitScript(()=>{
+      const origin={left:0,top:0,width:1920,height:1080,availLeft:0,availTop:0,availWidth:1920,availHeight:1040,label:'Presenter'};
+      const audience={...origin,left:1920,availLeft:1920,label:'Audience'};
+      Object.defineProperty(window,'screen',{configurable:true,value:origin});
+      window.screenRequests=0;window.fullscreenTargets=[];
+      window.windowBoundsCalls=[];
+      const resizeTo=window.resizeTo.bind(window),moveTo=window.moveTo.bind(window);
+      window.resizeTo=(width,height)=>{window.windowBoundsCalls.push(['resize',width,height]);return resizeTo(width,height);};
+      window.moveTo=(left,top)=>{window.windowBoundsCalls.push(['move',left,top]);return moveTo(left,top);};
+      const open=window.open.bind(window);window.popupFeatures=[];
+      window.open=(url,name,features)=>{window.popupFeatures.push(features);return open(url,name,features);};
+      window.getScreenDetails=()=>{window.screenRequests++;return new Promise(resolve=>{window.allowScreenAccess=()=>resolve({screens:[origin,audience],currentScreen:origin,addEventListener(){},removeEventListener(){}});});};
+      Element.prototype.requestFullscreen=function(options){window.fullscreenTargets.push(options?.screen?.label||'default');Object.defineProperty(this.ownerDocument,'fullscreenElement',{configurable:true,get:()=>this});return Promise.resolve();};
+    });
+    const modelPresenterFrame=page=>page.evaluate(()=>{
+      window.presenterWidth=1120;
+      Object.defineProperties(window,{
+        outerWidth:{configurable:true,get:()=>window.presenterWidth},outerHeight:{configurable:true,get:()=>Math.round(window.presenterWidth*9/16)},
+        innerWidth:{configurable:true,get:()=>window.presenterWidth-16},innerHeight:{configurable:true,get:()=>Math.round(window.presenterWidth*9/16)-38}
+      });
+    });
+    const localPage=await context.newPage();
+    await localPage.goto(local.url+'?local-present=1');
+    await localPage.evaluate(()=>htmlDeck.ready);
+    await modelPresenterFrame(localPage);
+    assert.equal(await localPage.evaluate(()=>window.screenRequests),0,'opening the default HTML must not prompt for screen permission');
+    await localPage.locator('#tab-show').click();await localPage.locator('#presenter').click();
+    await localPage.waitForFunction(()=>window.screenRequests===1);
+    assert.equal(await localPage.locator('#controller').isVisible(),true,'screen permission belongs to the visible presenter');
+    assert.deepEqual(await localPage.evaluate(()=>window.popupFeatures),[],'no audience may cover the pending permission prompt');
+    assert.equal(context.pages().length,1,'wait for Allow before creating an audience window');
+    const localPopup=context.waitForEvent('page');await localPage.evaluate(()=>window.allowScreenAccess());const localAudience=await localPopup;
+    await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='presenting');
+    assert.equal(await localPage.evaluate(()=>window.screenRequests),1);
+    assert.deepEqual(await localAudience.evaluate(()=>window.fullscreenTargets),['Audience']);
+    const features=await localPage.evaluate(()=>window.popupFeatures[0]);
+    assert.ok(Number(features.match(/left=(-?\d+)/)[1])>=1920,'open directly on the granted secondary screen');
+    const popupWidth=Number(features.match(/width=(\d+)/)[1]),popupHeight=Number(features.match(/height=(\d+)/)[1]);
+    assert.equal(popupWidth+16,1120,'popup viewport plus frame matches the presenter outer width');
+    assert.equal(popupHeight+38,630,'the complete window, including chrome, uses 16:9');
+    const initialBoundsCalls=await localAudience.evaluate(()=>window.windowBoundsCalls);
+    assert.ok(initialBoundsCalls.some(call=>call[0]==='resize'&&call[1]===1120&&call[2]===630),`correct the actual popup outer size after opening: ${JSON.stringify(initialBoundsCalls)}`);
+    const fullscreenBoundsCalls=await localAudience.evaluate(()=>window.windowBoundsCalls.length);
+    await localPage.evaluate(()=>{window.presenterWidth=960;window.dispatchEvent(new Event('resize'));});
+    assert.equal(await localAudience.evaluate(()=>window.windowBoundsCalls.length),fullscreenBoundsCalls,'resizing the presenter must not move or shrink a fullscreen audience');
+    assert.equal(await localPage.locator('#controller').isVisible(),true);
+    assert.equal(await localAudience.locator('#controller,.speaker-note').count(),0);
+    await localPage.locator('#controller-end').click();
+    await localPage.waitForFunction(()=>!document.body.classList.contains('controller-mode'));
+    await localPage.reload();
+    await modelPresenterFrame(localPage);
+    await localPage.evaluate(()=>{window.getScreenDetails=async()=>{throw new DOMException('denied','NotAllowedError');};});
+    await localPage.locator('#present').click();
+    await localPage.waitForFunction(()=>document.getElementById('dual-screen-status').dataset.phase==='manual');
+    assert.equal(await localPage.locator('#dual-screen-dialog').isVisible(),true,'permission denial retains the manual path');
+    assert.equal(await localPage.locator('#controller').isVisible(),true,'permission denial retains the presenter');
+    assert.deepEqual(await localPage.evaluate(()=>window.popupFeatures),[],'denial must not open an audience over the presenter');
+    assert.equal(context.pages().length,1);
+    const deniedPopup=context.waitForEvent('page');await localPage.locator('#dual-manual').click();const deniedAudience=await deniedPopup;
+    await localPage.evaluate(()=>{window.presenterWidth=960;window.dispatchEvent(new Event('resize'));});
+    await deniedAudience.waitForFunction(()=>window.windowBoundsCalls.some(call=>call[0]==='resize'&&call[1]===960&&call[2]===540));
+    await deniedAudience.evaluate(()=>Object.defineProperty(window,'screen',{configurable:true,value:{availLeft:0,availTop:0,availWidth:800,availHeight:600}}));
+    await localPage.evaluate(()=>{window.presenterWidth=1120;window.dispatchEvent(new Event('resize'));});
+    await deniedAudience.waitForFunction(()=>window.windowBoundsCalls.some(call=>call[0]==='resize'&&call[1]===800&&call[2]===450));
+    await localPage.locator('#controller-end').click();await localPage.reload();
+    await localPage.locator('#present').click();await localPage.waitForFunction(()=>window.screenRequests===1);
+    await localPage.locator('#controller-end').click();
+    await localPage.evaluate(async()=>{window.allowScreenAccess();await new Promise(resolve=>setTimeout(resolve,0));});
+    assert.deepEqual(await localPage.evaluate(()=>window.popupFeatures),[],'late permission after ending must not create an audience');
+    assert.equal(context.pages().length,1);
+  } finally {await context.close();await local.close();}
   await page.evaluate(async()=>{window.exportHook=false;htmlDeck.registerEffect({id:'test',index:0,getState:()=>({}),restoreState:()=>{},prepareExport:async()=>{await new Promise(resolve=>setTimeout(resolve,25));window.exportHook=true;}});await htmlDeck.prepareExport({index:0});});
   assert.equal(await page.evaluate(()=>window.exportHook),true);assert.deepEqual(errors,[]);
   console.log('PASS: file:// presenter/audience, notes, steps, SVG/forms/canvas/3D, ink/laser, reopen state, print relocation and async export API.');
